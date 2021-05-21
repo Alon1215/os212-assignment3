@@ -1,3 +1,22 @@
+#define MAX_PSYC_PAGES 16
+#define MAX_TOTAL_PAGES 32
+
+enum pstate {FREE, DISK, FILE};
+
+struct mpage {
+  uint va;              // virtual address
+  enum pstate state;    // state of page
+  int allpagesindex;    // index in all pages array
+  int entriesarrayindex;// index in all etries array / offset in file
+};
+
+struct link_mpage
+{
+  /* data */
+};
+
+
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -107,4 +126,11 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
+
+  // <<< Task 1
+  struct mpage allpages[MAX_TOTAL_PAGES]; // array of the total pages
+  char entriesarray[17];                  // array to indicate which offset / entry is file is free  TODO: is it MAX_PSYC_PAGES
+  int physcnumber;                         // number of pages in physical pages 
+  
+  // >>> Task 1 END
 };
