@@ -1,16 +1,16 @@
-enum pstate {FREE, DISK, FILE};
+enum pstate {FREE, RAM, FILE};
 
 struct mpage {
-  uint va;              // virtual address
+  uint64 va;              // virtual address
   enum pstate state;    // state of page
   int allpagesindex;    // index in all pages array
   int entriesarrayindex;// index in all etries array / offset in file
 };
 
-struct link_mpage
-{
-  /* data */
-};
+// struct link_mpage
+// {
+//   /* data */
+// };
 
 
 

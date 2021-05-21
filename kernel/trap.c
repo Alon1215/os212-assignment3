@@ -49,8 +49,11 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
+
+  /////////////////TASK1////////////->
+  uint64 scause = r_scause();
   
-  if(r_scause() == 8){
+  if(scause == 8){
     // system call
 
     if(p->killed)
@@ -65,6 +68,13 @@ usertrap(void)
     intr_on();
 
     syscall();
+
+  }else if(scause ==13 || scause == 15)
+  {
+    handlepagefault();
+    
+  
+  
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

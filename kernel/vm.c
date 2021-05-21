@@ -5,9 +5,9 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h" // Task 1
 
 #include "proc.h" // Task 1
-
 /*
  * the kernel's page table.
  */
@@ -437,9 +437,9 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 // Adding a given page the proc's swap file
 int pagetoswapfile(struct mpage* page){
   struct proc* p = myproc();
-
+  pte_t *pte;
   int offset;
-  for (offset = 0; offset <= MAX_PSYC_PAGES; offset+1){
+  for (offset = 0; offset <= MAX_PSYC_PAGES; offset++){
     if (!p->fileentries[offset]) goto found;
   }
 
@@ -448,54 +448,145 @@ int pagetoswapfile(struct mpage* page){
 
   found:
 
-  pte_t *pte = walk(p->pagetable, page->va, 0);
+    
+    pte  = walk(p->pagetable, page->va, 0);
 
-  // Should we check the (PTE_P & *pte)?
-  if (!pte){
-    printf("pagetoswapfile: pte = 0\n");
-    return -1;
-  } 
-  
-  if(writeToSwapFile(p, (char *)page->va, (offset*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
-  
-  p->fileentries[offset] = 1;
-  p->swapednumber++;
-  page->state = FILE;
-  *pte = (*pte | PTE_PG) &~ PTE_V; // set PTE_PG flag up, and PTE_V down
+    // Should we check the (PTE_P & *pte)?
+    if (!pte){
+      printf("pagetoswapfile: pte = 0\n");
+      return -1;
+    } 
+    
+    if(writeToSwapFile(p, (char *)page->va, (offset*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
+    
+    p->fileentries[offset] = 1;
+    p->swapednumber++;
+    page->state = FILE;
+    *pte = (*pte | PTE_PG) &~ PTE_V; // set PTE_PG flag up, and PTE_V down
 
   return 0;
 }
 
-int pysicpagetoswapfile(struct mpage* page) {
+int physicpagetoswapfile(struct mpage* page) {
 
   if (pagetoswapfile(page) == -1) return -1;
 
   struct proc *p = myproc();
   p->physcnumber--;
-  kfree(page->va);
+  kfree((char*)page->va);
   // TODO: is there anything else to do to release the pysic page?
   return 0;
 }
 
-// Retrieving pages on demand (file to page)
-int retrievingpage (struct mpage* page){
+int filetophysical(struct mpage* page) {
+  char * va;
+  uint64 pa;
   struct proc *p = myproc();
-  pte_t *pte;
-  char *va;
 
-  if(p->physcnumber >= MAX_PSYC_PAGES){
-
-    // TODO: implement in task 2 (or soon)
-  
-  }
-
+  // allocate a new page in the physical memory 
   if ((va = kalloc()) == 0){
     printf("retrievingpage: kalloc failed\n");
     return -1;
   } 
+  //archive the pa from the va we got in kalloc
+  ///TODO: assure this is the right way to get pa.
+  if((pa = walkaddr(p->pagetable,(uint64)va))==0) 
+    return -1;
+
+  //we need to map the page va to the new physical memory we allocated. 
+  ///TODO: decide what permissions we want.
+  mappages(p->pagetable,page->va,PGSIZE,pa,PTE_R | PTE_W);
 
 
+  // copy page to pa
+  if(readFromSwapFile(p,(char*)page->va,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
+    return -1;
+  }
+  pte_t * pte;
+
+  //get pte in the pagetable in order to set the flags
+  if ((pte = walk(p->pagetable,page->va, 0)) == 0){
+    return -1;
+  }
+  p->fileentries[page->entriesarrayindex] = 0;
+  page->state = RAM;
+  page->entriesarrayindex = -1;
+  *pte = (*pte | PTE_V) &~ PTE_PG;
+
+ 
+  return 0;
 }
+
+//TASK2:
+int getpagetoreplace(){
+
+  return 0;
+}
+
+
+
+
+// Retrieving pages on demand (file to page)
+int retrievingpage (struct mpage* page){
+  //struct proc *p = myproc();
+  //pte_t *pte;
+  //char *va;
+  int pagetoreplace; 
+  ///TODO: create getpagetoreplace. which choose page to swap.
+  if((pagetoreplace = getpagetoreplace()) >0){
+    physicpagetoswapfile(&myproc()->allpages[pagetoreplace]);
+  
+  }
+
+  
+  ///TODO: it's okay to return? or panic?!
+  if (filetophysical(page) < 0){
+    return -1;
+  }
+
+  
+
+  return 0 ;
+}
+
+
+
+int handlepagefault(){
+  struct proc *p = myproc();
+  //retreive adress caused pagefault
+  uint64 va_fault = r_stval();
+
+  pte_t* pte; 
+  if ((pte = walk(p->pagetable,va_fault,0)) < 0){
+    return -1;
+  } 
+
+  //check if the pte valid flag is down and file flagis up
+  if (!(*pte & PTE_V) && (*pte & PTE_PG))
+  {
+    int i;
+    //find the page caused pagefault and swap it to the RAM
+    for ( i = 0; i < MAX_TOTAL_PAGES; i++)
+    {
+      if(p->allpages[i].va == va_fault){
+        break;
+      }
+    }
+    if (i == MAX_TOTAL_PAGES){
+      panic("page caused fault wasnt found");
+    }
+    retrievingpage(&p->allpages[i]);
+  }
+  ///TODO: how can we detect segmentation fault? and hoe to handle this case???
+  //--seg fault--//
+
+
+
+  //
+
+  return 0;
+}
+
 
 
 
