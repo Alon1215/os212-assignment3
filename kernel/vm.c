@@ -433,17 +433,6 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 // <<< Task 1
-int pysicpagetoswapfile(struct mpage* page) {
-
-  if (pagetoswapfile(page) == -1) return -1;
-
-  struct proc *p = myproc();
-  p->physcnumber--;
-  kfree(page->va);
-  // TODO: is there anything else to do to release the pysic page?
-  return 0;
-}
-
 
 // Adding a given page the proc's swap file
 int pagetoswapfile(struct mpage* page){
@@ -474,6 +463,17 @@ int pagetoswapfile(struct mpage* page){
   page->state = FILE;
   *pte = (*pte | PTE_PG) &~ PTE_V; // set PTE_PG flag up, and PTE_V down
 
+  return 0;
+}
+
+int pysicpagetoswapfile(struct mpage* page) {
+
+  if (pagetoswapfile(page) == -1) return -1;
+
+  struct proc *p = myproc();
+  p->physcnumber--;
+  kfree(page->va);
+  // TODO: is there anything else to do to release the pysic page?
   return 0;
 }
 
