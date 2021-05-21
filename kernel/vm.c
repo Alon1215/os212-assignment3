@@ -6,6 +6,8 @@
 #include "defs.h"
 #include "fs.h"
 
+#include "proc.h" // Task 1
+
 /*
  * the kernel's page table.
  */
@@ -429,3 +431,66 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// <<< Task 1
+
+// Adding a given page the proc's swap file
+int pagetoswapfile(struct mpage* page){
+  struct proc* p = myproc();
+
+  int offset;
+  for (offset = 0; offset <= MAX_PSYC_PAGES; offset+1){
+    if (!p->fileentries[offset]) goto found;
+  }
+  
+  panic("pagetoswapfile: No free entry in swao file");
+
+  found:
+
+  pte_t *pte = walk(p->pagetable, page->va, 0);
+
+  // Should we check the (PTE_P & *pte)?
+  if (!pte){
+    printf("pagetoswapfile: pte = 0\n");
+    return -1;
+  } 
+  
+  if(writeToSwapFile(p, (char *)page->va, (offset*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
+  
+  p->fileentries[offset] = 1;
+  p->swapednumber++;
+  page->state = FILE;
+  *pte = (*pte | PTE_PG) &~ PTE_V; // set PTE_PG flag up, and PTE_V down
+
+  p->physcnumber--;
+  kfree(page->va);
+  // TODO: is there anything else to do to release the pysic page?
+
+
+  return 0;
+}
+
+// Retrieving pages on demand (file to page)
+int retrievingpage (struct mpage* page){
+  struct proc *p = myproc();
+  pte_t *pte;
+  char *va;
+
+  if(p->physcnumber >= MAX_PSYC_PAGES){
+
+    // TODO: implement in task 2 (or soon)
+  
+  }
+
+  if ((va = kalloc()) == 0){
+    printf("retrievingpage: kalloc failed\n");
+    return -1;
+  } 
+
+
+}
+
+
+
+
+// >>> Task 1 END

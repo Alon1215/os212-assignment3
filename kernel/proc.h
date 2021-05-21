@@ -1,6 +1,3 @@
-#define MAX_PSYC_PAGES 16
-#define MAX_TOTAL_PAGES 32
-
 enum pstate {FREE, DISK, FILE};
 
 struct mpage {
@@ -128,9 +125,10 @@ struct proc {
   struct file *swapFile;
 
   // <<< Task 1
-  struct mpage allpages[MAX_TOTAL_PAGES]; // array of the total pages
-  char entriesarray[17];                  // array to indicate which offset / entry is file is free  TODO: is it MAX_PSYC_PAGES
-  int physcnumber;                         // number of pages in physical pages 
+  struct mpage allpages[MAX_TOTAL_PAGES];// array of the total pages
+  char fileentries[17];                  // array to indicate which offset / entry is file is free  TODO: is it MAX_PSYC_PAGES
+  int physcnumber;                       // number of pages in physical pages 
+  int swapednumber;                      // number of pages in swap file
   
   // >>> Task 1 END
 };
