@@ -513,47 +513,58 @@ uint64 countSetBits(unsigned int n)
 
 int nfua(){
   struct proc *p = myproc();
-  struct mpage *page;
+  struct mpage *current = p->queueRAM;
   int minvalue;
-  int minindex;
-  int i;
-  for (i=0; i<MAX_TOTAL_PAGES; i++){
-    page = &p->allpages[i];
+  struct mpage *page;
+  
+  while (current != 0){
     // look for pages in RAM & compare to min value
-    if( page->entriesarrayindex == -1 && page->access_counter < minvalue){
-      minvalue = page->access_counter;
-      minindex = i;
+    if( current->entriesarrayindex == -1 && current->access_counter < minvalue){
+      minvalue = current->access_counter;
+      page = current;
     }
   }
-  ///TODO: can't we check only RAM pages?
-  return minindex;
+  ///TODO: should return index or page?
+  return page->allpagesindex;
 }
 int lapa(){
   struct proc *p = myproc();
+  struct mpage *current = p->queueRAM;
   struct mpage *page;
   int minvalue;
   int minindex;
-  int i;
-  for (i=0; i<MAX_TOTAL_PAGES; i++){
-    page = &p->allpages[i];
-    // look for pages in RAM & compare to min value
-    if(page->va != 0 && page->entriesarrayindex == -1){
-      if (countSetBits(page->access_counter) < countSetBits(minvalue) 
-      || (countSetBits(page->access_counter) == countSetBits(minvalue)) && page->access_counter < minvalue){
-        minvalue = page->access_counter;
-        minindex = i;
+  
+  while (current != 0){
+    // look for pages in RAM & compare
+    if(current->va != 0 && current->entriesarrayindex == -1){
+      if (countSetBits(current->access_counter) < countSetBits(minvalue) 
+      || (countSetBits(current->access_counter) == countSetBits(minvalue)) && current->access_counter < minvalue){
+        minvalue = current->access_counter;
+        page = current;
       }
     }
   }
   
-  ///TODO: can't we check only RAM pages?
-  return minindex;
-  return 0;
+  ///TODO: should return index or page?
+  return page->allpagesindex;
 }
 int scfifo(){
-  
+  struct proc *p = myproc();
+  struct mpage *current = p->queueRAM;
+  struct mpage *page = 0;
+  pte_t *pte;
 
-  return 0;
+  while (current != 0){
+    pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
+    if ((*pte & PTE_A)){
+      *pte & ~PTE_A; // turn access bit off
+    } else { 
+      page = current;
+      break;
+    }
+    if (current->next == 0 && page == 0) current = p->queueRAM; // demonstrate a circular queue for scfifo logic
+  }
+  return page->allpagesindex;
 }
 
 int getpagetoreplace(){

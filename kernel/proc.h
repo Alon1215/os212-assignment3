@@ -6,11 +6,16 @@ struct mpage {
   int allpagesindex;      // index in all pages array
   int entriesarrayindex;  // index in all etries array / offset in file
   uint64 access_counter;
+
+  struct mpage *prev;
+  struct mpage *next;
 };
 
 // struct link_mpage
 // {
-//   /* data */
+//   struct mpage *data;
+//   struct mpage *prev;
+//   struct mpage *next;
 // };
 
 
@@ -126,10 +131,10 @@ struct proc {
   struct file *swapFile;
 
   // <<< Task 1
-  struct mpage allpages[MAX_TOTAL_PAGES];// array of the total pages
-  char fileentries[17];                  // array to indicate which offset / entry is file is free  TODO: is it MAX_PSYC_PAGES
-  int physcnumber;                       // number of pages in physical pages 
-  int swapednumber;                      // number of pages in swap file
-  
+  struct mpage allpages[MAX_TOTAL_PAGES]; // array of the total pages
+  char fileentries[17];                   // array to indicate which offset / entry is file is free  TODO: is it MAX_PSYC_PAGES
+  int physcnumber;                        // number of pages in physical pages 
+  int swapednumber;                       // number of pages in swap file
   // >>> Task 1 END
+  struct mpage *queueRAM;                 // queue of pages in physical memory  
 };
