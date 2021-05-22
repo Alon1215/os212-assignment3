@@ -38,6 +38,7 @@ exec(char *path, char **argv)
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
 
+  
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
@@ -115,6 +116,17 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
+
+  if (SELECTION != NONE){ // clean pages data in proc
+    struct proc *p = myproc();
+    struct mapge *page;
+    int i;
+    for (i=0; i < MAX_TOTAL_PAGES; i++) resetpagemd(p, &p->allpages[i]);
+    for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
+    p->physcnumber = 0;
+    p->swapednumber = 0;
+    p->swapFile = 0;
+  }
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

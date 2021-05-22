@@ -159,9 +159,14 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 }
 
 //  ---Task 1 ----
-// void cleanpagefromfile(page) {
 
-// }
+// reset page meta data in mpage struct and proc's meta data fields
+void resetpagemd(struct proc *p, struct mpage *page) {
+  page->allpagesindex = -1;
+  page->state = FREE;
+  page->va = -1; // check
+
+}
 
 // ---------------
 
@@ -197,10 +202,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
         panic("uvmunmap: not in file (but should be)");
 
         found:
+          resetpagemd(p,page);
           p->fileentries[page->entriesarrayindex] = 0;
-          page->allpagesindex = -1;
-          page->state = FREE;
-          page->va = -1; // check
       }
     } 
     ///TODO: if page in ram, any other action?
