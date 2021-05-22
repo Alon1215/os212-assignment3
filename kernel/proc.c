@@ -143,21 +143,26 @@ found:
  
   // <<< Task 1
   // initiate values:
-  p->physcnumber = 0;
-  p->swapednumber = 0;
-  
-  int i;
-  for (i = 0; i <= MAX_PSYC_PAGES; i++){
-    p->fileentries[i] = 0; 
+  if (SELECTION != NONE)
+  {
+      
+    
+    p->physcnumber = 0;
+    p->swapednumber = 0;
+    
+    int i;
+    for (i = 0; i <= MAX_PSYC_PAGES; i++){
+      p->fileentries[i] = 0; 
+    }
+    for (i = 0; i <= MAX_TOTAL_PAGES; i++){
+      struct mpage *page = &p->allpages[i];
+      page-> va = 0; ///TODO: is it valid?
+      page-> state  = FREE;
+      page-> allpagesindex = -1;
+      page-> entriesarrayindex =  -1;  
+    }
+    p->swapFile = createSwapFile(p);
   }
-  for (i = 0; i <= MAX_TOTAL_PAGES; i++){
-    struct mpage *page = &p->allpages[i];
-    page-> va = 0; ///TODO: is it valid?
-    page-> state  = FREE;
-    page-> allpagesindex = -1;
-    page-> entriesarrayindex =  -1;  
-  }
-  p->swapFile = createSwapFile(p);
   
   // >>> Task 1 END
 
@@ -396,6 +401,14 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  ///----TASK1---/////
+  if (SELECTION != NONE)
+  {
+    removeSwapFile(p);
+  }
+  ////////////////////
+  
 
   begin_op();
   iput(p->cwd);

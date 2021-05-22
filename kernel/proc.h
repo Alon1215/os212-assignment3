@@ -5,6 +5,7 @@ struct mpage {
   enum pstate state;    // state of page
   int allpagesindex;    // index in all pages array
   int entriesarrayindex;// index in all etries array / offset in file
+  uint64 access_counter;
 };
 
 // struct link_mpage
