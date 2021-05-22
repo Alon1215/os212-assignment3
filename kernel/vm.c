@@ -158,6 +158,13 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   return 0;
 }
 
+//  ---Task 1 ----
+// void cleanpagefromfile(page) {
+
+// }
+
+// ---------------
+
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
@@ -173,15 +180,39 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) == 0){ // page is not in RAM, check if page is in swap file
+      if ((*pte & PTE_PG) == 0){ 
+        panic("uvmunmap: not mapped");
+      
+      if (SELECTION != NONE){ // was paged, delete from SwapFile
+        struct proc *p = myproc();
+        struct mpage *page;
+        int i;
+        for(i=0; i < MAX_TOTAL_PAGES; i++){
+          page = &p->allpages[i];
+          if (page->va == va){ //found in file
+            goto found;
+          }
+        }
+        panic("uvmunmap: not in file (but should be)");
+
+        found:
+          p->fileentries[page->entriesarrayindex] = 0;
+          page->allpagesindex = -1;
+          page->state = FREE;
+          page->va = -1; // check
+      }
+    } 
+    ///TODO: if page in ram, any other action?
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
+    
     if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
     *pte = 0;
+
   }
 }
 
