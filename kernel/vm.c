@@ -202,6 +202,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
         }
         panic("uvmunmap: not in file (but should be)");
 
+
         found:
           resetpagemd(p,page);
           p->fileentries[page->entriesarrayindex] = 0;

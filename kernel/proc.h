@@ -2,9 +2,9 @@ enum pstate {FREE, RAM, FILE};
 
 struct mpage {
   uint64 va;              // virtual address
-  enum pstate state;    // state of page
-  int allpagesindex;    // index in all pages array
-  int entriesarrayindex;// index in all etries array / offset in file
+  enum pstate state;      // state of page
+  int allpagesindex;      // index in all pages array
+  int entriesarrayindex;  // index in all etries array / offset in file
   uint64 access_counter;
 };
 
