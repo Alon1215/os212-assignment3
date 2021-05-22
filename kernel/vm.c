@@ -252,12 +252,36 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
+  struct proc *p = myproc();
+  struct page *page;
 
   if(newsz < oldsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += PGSIZE){
+    if (SELECTION != NONE){
+      if (p->pid>2){
+        //in case there are already 32 pages, return -1
+        if ((p->physcnumber) + (p->swapednumber)==32)
+        {
+          return 0 ;
+        }
+        
+          //chaeck whether we need to make space for the new page in the ram.
+        if (p->physcnumber == 16)
+        {
+          ///TODO: after implement getpagetoreplace, check what can it retrun.
+          int ptomoveindex = getpagetoreplace();
+          if (physicpagetoswapfile(&p->allpages[ptomoveindex])<0){
+              // 0 indicates a failure in this function
+              return 0;
+
+          }
+        }  
+      }    
+    }
+    //now we know there is enough place on the ram for allocating a new page
     mem = kalloc();
     if(mem == 0){
       uvmdealloc(pagetable, a, oldsz);
