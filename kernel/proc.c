@@ -143,8 +143,8 @@ found:
  
   // <<< Task 1
   // initiate values:
-  if (SELECTION != NONE)
-  {
+  #ifndef NONE
+  
       
     
     p->physcnumber = 0;
@@ -161,8 +161,8 @@ found:
       page-> allpagesindex = -1;
       page-> entriesarrayindex =  -1;  
     }
-    p->swapFile = createSwapFile(p);
-  }
+    createSwapFile(p);
+  #endif
   
   // >>> Task 1 END
 
@@ -316,7 +316,8 @@ fork(void)
 
 
   ///--------TASK1--------///////
-  if (SELECTION != NONE && p->pid>2)
+  #ifndef NONE
+  if ( p->pid>2)
   {
     //copy all proc fields
     memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
@@ -328,10 +329,11 @@ fork(void)
     ///TODO: maybe its impossible to crate a very big buffer like here, maybe split
     char buff[PGSIZE*17];
     readFromSwapFile(p, buff, 0, PGSIZE*17);
-    writeToSwapFile(np,buff,0,PGSIZE*17)
+    writeToSwapFile(np,buff,0,PGSIZE*17);
 
 
   }
+  #endif
   
 
 
@@ -403,10 +405,11 @@ exit(int status)
   }
 
   ///----TASK1---/////
-  if (SELECTION != NONE)
-  {
+  #ifndef NONE
+  
     removeSwapFile(p);
-  }
+  
+  #endif
   ////////////////////
   
 

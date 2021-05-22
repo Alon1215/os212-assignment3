@@ -117,16 +117,20 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
-  if (SELECTION != NONE){ // clean pages data in proc
-    struct proc *p = myproc();
-    struct mapge *page;
-    int i;
-    for (i=0; i < MAX_TOTAL_PAGES; i++) resetpagemd(p, &p->allpages[i]);
+  #ifndef NONE// clean pages data in proc
+    //struct mapge *page;
+    for (i=0; i < MAX_TOTAL_PAGES; i++){
+      struct mpage *page =  &p->allpages[i];
+      page-> allpagesindex = -1;
+      page-> state = FREE;
+      page->va = -1; // check
+
+    } 
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
     p->physcnumber = 0;
     p->swapednumber = 0;
     p->swapFile = 0;
-  }
+  #endif
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

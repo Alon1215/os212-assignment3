@@ -8,6 +8,8 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+//TASK1
+struct mpage;
 
 // bio.c
 void            binit(void);
@@ -182,8 +184,11 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 
 
+
 //TASK1
 int             handlepagefault(void);
+int             getpagetoreplace(void);
+int             physicpagetoswapfile( struct mpage* );
 
 // plic.c
 void            plicinit(void);

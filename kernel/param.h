@@ -16,8 +16,3 @@
 #define MAX_PSYC_PAGES 16
 #define MAX_TOTAL_PAGES 32
 
-//Task2
-#define NFUA 0
-#define LAPA 1
-#define SCFIFO 2
-#define NONE 3

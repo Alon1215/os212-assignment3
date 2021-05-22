@@ -189,7 +189,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       if ((*pte & PTE_PG) == 0){ 
         panic("uvmunmap: not mapped");
       
-      if (SELECTION != NONE){ // was paged, delete from SwapFile
+      #ifndef NONE
+     
         struct proc *p = myproc();
         struct mpage *page;
         int i;
@@ -204,7 +205,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
         found:
           resetpagemd(p,page);
           p->fileentries[page->entriesarrayindex] = 0;
-      }
+      
+      #endif
     } 
     ///TODO: if page in ram, any other action?
     if(PTE_FLAGS(*pte) == PTE_V)
@@ -217,6 +219,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     *pte = 0;
 
   }
+}
 }
 
 // create an empty user page table.
@@ -256,14 +259,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   char *mem;
   uint64 a;
   struct proc *p = myproc();
-  struct page *page;
+  //struct page *page;
 
   if(newsz < oldsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += PGSIZE){
-    if (SELECTION != NONE){
+    #ifndef NONE
+    
       if (p->pid>2){
         //in case there are already 32 pages, return -1
         if ((p->physcnumber) + (p->swapednumber)==32)
@@ -283,7 +287,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
           }
         }  
       }    
-    }
+    
+    #endif
     //now we know there is enough place on the ram for allocating a new page
     mem = kalloc();
     if(mem == 0){
@@ -492,6 +497,12 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 // <<< Task 1
 
+//TASK2:
+int getpagetoreplace(){
+
+  return 0;
+}
+
 // Adding a given page the proc's swap file
 int pagetoswapfile(struct mpage* page){
   struct proc* p = myproc();
@@ -560,10 +571,10 @@ int filetophysical(struct mpage* page) {
   if(readFromSwapFile(p,(char*)page->va,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
   }
-  pte_t * pte;
+  pte_t* pte;
 
   //get pte in the pagetable in order to set the flags
-  if ((pte = walk(p->pagetable,page->va, 0)) == 0){
+  if((pte = walk(p->pagetable,page->va, 0)) == 0){
     return -1;
   }
   p->fileentries[page->entriesarrayindex] = 0;
@@ -575,11 +586,7 @@ int filetophysical(struct mpage* page) {
   return 0;
 }
 
-//TASK2:
-int getpagetoreplace(){
 
-  return 0;
-}
 
 
 
