@@ -8,6 +8,11 @@
 #include "spinlock.h" // Task 1
 
 #include "proc.h" // Task 1
+
+int enqueueRAM(struct mpage *);
+int dequeueRAM();
+int queueRAMremove(struct mpage *); 
+
 /*
  * the kernel's page table.
  */
@@ -651,9 +656,9 @@ int pagetoswapfile(struct mpage* page){
 int physicpagetoswapfile(struct mpage* page) {
 
   if (pagetoswapfile(page) == -1) return -1;
-
   struct proc *p = myproc();
   p->physcnumber--;
+  queueRAMremove(page);
   kfree((char*)page->va);
   // TODO: is there anything else to do to release the pysic page?
   return 0;
@@ -693,7 +698,7 @@ int filetophysical(struct mpage* page) {
   page->state = RAM;
   page->entriesarrayindex = -1;
   *pte = (*pte | PTE_V) &~ PTE_PG;
-
+  enqueueRAM(page); // Add page to RAM queue
  
   return 0;
 }
@@ -754,7 +759,7 @@ int handlepagefault(){
     }
     retrievingpage(&p->allpages[i]);
   }
-  ///TODO: how can we detect segmentation fault? and hoe to handle this case???
+  ///TODO: how can we detect segmentation fault? and how to handle this case???
   //--seg fault--//
 
 
@@ -784,9 +789,71 @@ int updatepagesage(struct proc* p){
       }
     }
   }
-
-
 }
 
+int enqueueRAM(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  return 0;
+}
+
+int dequeueRAM(){
+  struct proc *p = myproc();
+  struct mpage *current;
+  struct mpage *page;
+  if (p->queueRAM == 0){
+    return -1;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+
+    page = current;
+    
+    if (p->queueRAM == current){
+      p->queueRAM = 0;
+    } else { 
+      current->prev->next = 0;
+    }
+  }
+  return page;
+}
+
+int queueRAMremove(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      if (current == page){
+        if (p->queueRAM == current){
+          p->queueRAM = 0;
+        } else { 
+          current->prev->next = current->next ;
+        }
+      }
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  return 0;
+}
 
 // >>> Task 1 END

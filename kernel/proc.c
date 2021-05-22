@@ -159,6 +159,8 @@ found:
       struct mpage *page = &p->allpages[i];
       page-> va = 0; ///TODO: is it valid?
       page-> state  = FREE;
+      page->next = 0;
+      page->prev = 0;
       page-> allpagesindex = -1;
       page-> entriesarrayindex =  -1;  
     }
