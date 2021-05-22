@@ -76,6 +76,7 @@ mycpu(void) {
 }
 
 // Return the current struct proc *, or zero if none.
+
 struct proc*
 myproc(void) {
   push_off();
@@ -161,8 +162,9 @@ found:
       page-> allpagesindex = -1;
       page-> entriesarrayindex =  -1;  
     }
-    createSwapFile(p);
+    
   #endif
+  //printf("in alloc proc after ifdef\n");//TODO delete
   
   // >>> Task 1 END
 
@@ -319,6 +321,7 @@ fork(void)
   #ifndef NONE
   if ( p->pid>2)
   {
+    //printf("in fork2\n");
     //copy all proc fields
     memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
     memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
@@ -327,9 +330,19 @@ fork(void)
 
     //deep copy of the swapped file
     ///TODO: maybe its impossible to crate a very big buffer like here, maybe split
-    char buff[PGSIZE*17];
-    readFromSwapFile(p, buff, 0, PGSIZE*17);
-    writeToSwapFile(np,buff,0,PGSIZE*17);
+    if (p->swapFile!=0)
+    {
+      char buff[1];
+  for (uint offset = 0; readFromSwapFile(p, buff, offset, 1) != -1; offset += 1, memset(buff, 0 , 1))
+  {
+    if (writeToSwapFile(np, buff, offset, 1) == -1)
+    {
+      panic("failed to copy swapFile");
+    }
+    }
+    
+    
+  }
 
 
   }
@@ -390,6 +403,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  printf("in exit\n");
   struct proc *p = myproc();
 
   if(p == initproc)
@@ -406,8 +420,13 @@ exit(int status)
 
   ///----TASK1---/////
   #ifndef NONE
-  
+  if (p->swapFile!=0)
+  {
     removeSwapFile(p);
+  }
+  
+  
+    
   
   #endif
   ////////////////////

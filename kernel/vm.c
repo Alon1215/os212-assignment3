@@ -185,41 +185,16 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0){ // page is not in RAM, check if page is in swap file
-      if ((*pte & PTE_PG) == 0){ 
-        panic("uvmunmap: not mapped");
-      
-      #ifndef NONE
-     
-        struct proc *p = myproc();
-        struct mpage *page;
-        int i;
-        for(i=0; i < MAX_TOTAL_PAGES; i++){
-          page = &p->allpages[i];
-          if (page->va == va){ //found in file
-            goto found;
-          }
-        }
-        panic("uvmunmap: not in file (but should be)");
-
-        found:
-          resetpagemd(p,page);
-          p->fileentries[page->entriesarrayindex] = 0;
-      
-      #endif
-    } 
-    ///TODO: if page in ram, any other action?
+    if((*pte & PTE_V) == 0)
+      panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    
     if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
     *pte = 0;
-
   }
-}
 }
 
 // create an empty user page table.
@@ -256,6 +231,8 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
+
+  printf("in uvmalloc. process has %d physical and %d in file \n",myproc()->physcnumber,myproc()->swapednumber);//TODO delete
   char *mem;
   uint64 a;
   struct proc *p = myproc();
@@ -269,6 +246,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
     
       if (p->pid>2){
+        // printf("in uvmalloc in ifdef\n");//TODO delete
         //in case there are already 32 pages, return -1
         if ((p->physcnumber) + (p->swapednumber)==32)
         {
@@ -278,6 +256,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
           //chaeck whether we need to make space for the new page in the ram.
         if (p->physcnumber == 16)
         {
+
+          if (p->swapFile == 0)
+          {
+            createSwapFile(p);
+          }
+          
           ///TODO: after implement getpagetoreplace, check what can it retrun.
           int ptomoveindex = getpagetoreplace();
           if (physicpagetoswapfile(&p->allpages[ptomoveindex])<0){
@@ -290,6 +274,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     
     #endif
     //now we know there is enough place on the ram for allocating a new page
+    //printf("in uvmalloc after ifdef\n");//TODO delete
     mem = kalloc();
     if(mem == 0){
       uvmdealloc(pagetable, a, oldsz);
@@ -302,6 +287,26 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       return 0;
     }
   }
+  //update all data structures we added a new page:
+  if(p->pid>2){
+    
+    //find an empty slot in allpages:
+    int i;
+    for ( i = 0; i < 32; i++)
+    {
+      if (p->allpages[i].state == FREE)
+      {
+        break;
+      }
+      
+    }
+    p->allpages[i].state = RAM;
+    p->allpages[i].va = a;
+    p->allpages[i].allpagesindex = i;
+    p->allpages[i].entriesarrayindex = -1;
+    p->physcnumber++;
+
+  }
   return newsz;
 }
 
@@ -312,6 +317,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 uint64
 uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
+  printf("in uvmdeaaloc b1 \n");//TODO delete
   if(newsz >= oldsz)
     return oldsz;
 
@@ -499,6 +505,18 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 //TASK2:
 int getpagetoreplace(){
+  printf("in getpagetoreplace b1 \n");//TODO delete
+  int i;
+  for ( i = 0; i < 32; i++)
+  {
+    if (myproc()->allpages[i].state == RAM)
+    {
+      printf("found page to replace: %d\n",i);
+      return i;
+    }
+    
+  }
+  
 
   return 0;
 }
