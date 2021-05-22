@@ -157,6 +157,7 @@ found:
     page-> allpagesindex = -1;
     page-> entriesarrayindex =  -1;  
   }
+  p->swapFile = createSwapFile(p);
   
   // >>> Task 1 END
 
@@ -307,6 +308,30 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+
+  ///--------TASK1--------///////
+  if (SELECTION != NONE && p->pid>2)
+  {
+    //copy all proc fields
+    memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
+    memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
+    np->physcnumber = p->physcnumber;
+    np->swapednumber = p->swapednumber;
+
+    //deep copy of the swapped file
+    ///TODO: maybe its impossible to crate a very big buffer like here, maybe split
+    char buff[PGSIZE*17];
+    readFromSwapFile(p, buff, 0, PGSIZE*17);
+    writeToSwapFile(np,buff,0,PGSIZE*17)
+
+
+  }
+  
+
+
+
+  //---------------------////////
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
