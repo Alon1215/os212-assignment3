@@ -12,6 +12,8 @@ static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uin
 int
 exec(char *path, char **argv)
 {
+
+  //printf("in exec b1 \n");//TODO delete
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -129,7 +131,10 @@ exec(char *path, char **argv)
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
     p->physcnumber = 0;
     p->swapednumber = 0;
-    p->swapFile = 0;
+    if(p->swapFile!=0){
+      removeSwapFile(p);
+    }
+    //p->swapFile = 0;
   #endif
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
