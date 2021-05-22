@@ -123,7 +123,7 @@ exec(char *path, char **argv)
       struct mpage *page =  &p->allpages[i];
       page-> allpagesindex = -1;
       page-> state = FREE;
-      page->va = -1; // check
+      page->va = 0; // check
 
     } 
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;

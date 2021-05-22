@@ -160,13 +160,13 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 
 //  ---Task 1 ----
 
-// reset page meta data in mpage struct and proc's meta data fields
-void resetpagemd(struct proc *p, struct mpage *page) {
-  page->allpagesindex = -1;
-  page->state = FREE;
-  page->va = -1; // check
+// // reset page meta data in mpage struct and proc's meta data fields
+// void resetpagemd(struct proc *p, struct mpage *page) {
+//   page->allpagesindex = -1;
+//   page->state = FREE;
+//   page->va = -1; // check
 
-}
+// }
 
 // ---------------
 
@@ -499,9 +499,81 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 // <<< Task 1
 
 //TASK2:
-int getpagetoreplace(){
+// simple bit counter from SO
+uint64 countSetBits(unsigned int n)
+{
+    unsigned int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+
+
+int nfua(){
+  struct proc *p = myproc();
+  struct mpage *page;
+  int minvalue;
+  int minindex;
+  int i;
+  for (i=0; i<MAX_TOTAL_PAGES; i++){
+    page = &p->allpages[i];
+    // look for pages in RAM & compare to min value
+    if( page->entriesarrayindex == -1 && page->access_counter < minvalue){
+      minvalue = page->access_counter;
+      minindex = i;
+    }
+  }
+  ///TODO: can't we check only RAM pages?
+  return minindex;
+}
+int lapa(){
+  struct proc *p = myproc();
+  struct mpage *page;
+  int minvalue;
+  int minindex;
+  int i;
+  for (i=0; i<MAX_TOTAL_PAGES; i++){
+    page = &p->allpages[i];
+    // look for pages in RAM & compare to min value
+    if(page->va != 0 && page->entriesarrayindex == -1){
+      if (countSetBits(page->access_counter) < countSetBits(minvalue) 
+      || (countSetBits(page->access_counter) == countSetBits(minvalue)) && page->access_counter < minvalue){
+        minvalue = page->access_counter;
+        minindex = i;
+      }
+    }
+  }
+  
+  ///TODO: can't we check only RAM pages?
+  return minindex;
+  return 0;
+}
+int scfifo(){
+  
 
   return 0;
+}
+
+int getpagetoreplace(){
+  #if SELECTION == NONE
+    printf("getpagetoreplace(): error SELECTION=NONE\n");
+    return -1;
+  #endif
+  
+  #if SELECTION == NFUA
+    return nfua();
+  #endif
+  #if SELECTION == LAPA
+    return lapa();
+  #endif
+  #if SELECTION == SCFIFO
+    return scfifo();
+  #endif
+  
+  panic("getpagetoreplace: bad SELECTION"); // selected not valid, abort.
+  return -1;
 }
 
 // Adding a given page the proc's swap file
@@ -667,7 +739,7 @@ int updatepagesage(struct proc* p){
       page->access_counter >> 1;
       pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
       if ((*pte & PTE_A)){
-        page->access_counter &= (1L << 63); //TODO: right shift?
+        page->access_counter &= (1L << 31); //TODO: right shift?
 
         *pte & ~PTE_A; // turn access bit off
       }
