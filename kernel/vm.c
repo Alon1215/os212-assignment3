@@ -656,5 +656,26 @@ int handlepagefault(){
 
 
 
+int updatepagesage(struct proc* p){
+  struct mpage *page;
+  pte_t *pte;
+  int i;
+  for (i=0; i < MAX_TOTAL_PAGES; i++){
+    page = &p->allpages[i];
+    if (page->entriesarrayindex == -1){
+      // page is in RAM
+      page->access_counter >> 1;
+      pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
+      if ((*pte & PTE_A)){
+        page->access_counter &= (1L << 63); //TODO: right shift?
+
+        *pte & ~PTE_A; // turn access bit off
+      }
+    }
+  }
+
+
+}
+
 
 // >>> Task 1 END

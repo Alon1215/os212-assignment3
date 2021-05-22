@@ -515,6 +515,10 @@ scheduler(void)
         c->proc = p;
         swtch(&c->context, &p->context);
 
+        // <<< Task 2
+        updatepagesage(p); // if relevant, update age counter
+
+        // >>> Task 2 END
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
