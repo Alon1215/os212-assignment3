@@ -140,9 +140,24 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+ 
   // <<< Task 1
+  // initiate values:
   p->physcnumber = 0;
+  p->swapednumber = 0;
+  
+  int i;
+  for (i = 0; i <= MAX_PSYC_PAGES; i++){
+    p->fileentries[i] = 0; 
+  }
+  for (i = 0; i <= MAX_TOTAL_PAGES; i++){
+    struct mpage *page = &p->allpages[i];
+    page-> va = 0; ///TODO: is it valid?
+    page-> state  = FREE;
+    page-> allpagesindex = -1;
+    page-> entriesarrayindex =  -1;  
+  }
+  
   // >>> Task 1 END
 
   return p;
