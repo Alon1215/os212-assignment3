@@ -401,7 +401,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       page->entriesarrayindex = -1;
       p->physcnumber++;
 
-      enqueueRAM(page);
+
+      if (page->allpagesindex>2 )
+      {
+         enqueueRAM(page);
+      }
+      
+     
     }
     #endif
   }
