@@ -10,7 +10,7 @@
 #include "proc.h" // Task 1
 
 int enqueueRAM(struct mpage *);
-int dequeueRAM();
+struct mpage* dequeueRAM();
 int queueRAMremove(struct mpage *); 
 
 /*
@@ -385,6 +385,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   //update all data structures we added a new page:
     if(p->pid>2){
       //find an empty slot in allpages and fill metadata:
+      struct mpage *page;
       int i;
       for ( i = 0; i < 32; i++)
       {
@@ -393,11 +394,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       }
     
       //printf("set a new page in slot %d his va is %d \n",i,a);
-      p->allpages[i].state = RAM;
-      p->allpages[i].va = a;
-      p->allpages[i].allpagesindex = i;
-      p->allpages[i].entriesarrayindex = -1;
+      page = &p->allpages[i]; 
+      page->state = RAM;
+      page->va = a;
+      page->allpagesindex = i;
+      page->entriesarrayindex = -1;
       p->physcnumber++;
+
+      enqueueRAM(page);
     }
     #endif
   }
@@ -615,26 +619,211 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-// <<< Task 1
-
 //TASK2:
-int getpagetoreplace(){
-  //printf("in getpagetoreplace b1 \n");//TODO delete
-  int i;
-  for ( i = 31; i >= 0; i--)
-  {
-    //printf("state is %d \n",myproc()->allpages[i].state);
-    if (myproc()->allpages[i].state == RAM)
-    {
-      //printf("found page to replace: %d\n",i);
-      return i;
+// simple bit counter from SO
+uint64 countSetBits(unsigned int n)
+{
+    unsigned int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
     }
-    
+    return count;
+}
+
+
+int nfua(){
+  struct proc *p = myproc();
+  struct mpage *current = p->queueRAM;
+  int minvalue = 0x7FFFFFFF; ///TODO: check, just max int
+  struct mpage *page = current;
+  
+  while (current != 0){
+    // look for pages in RAM & compare to min value
+    if( current->entriesarrayindex == -1 && current->access_counter < minvalue){
+      minvalue = current->access_counter;
+      page = current;
+    }
+  }
+  ///TODO: should return index or page?
+  if (page == 0) return -1;
+  return page->allpagesindex;
+}
+int lapa(){
+  struct proc *p = myproc();
+  struct mpage *current = p->queueRAM;
+  struct mpage *page = current;
+  int minvalue = 0x7FFFFFFF; ///TODO: check, just max int
+  
+  while (current != 0){
+    // look for pages in RAM & compare
+    if(current->va != 0 && current->entriesarrayindex == -1){
+      if (countSetBits(current->access_counter) < countSetBits(minvalue) 
+      || ((countSetBits(current->access_counter) == countSetBits(minvalue)) && current->access_counter < minvalue)){
+        minvalue = current->access_counter;
+        page = current;
+      }
+    }
   }
   
+  ///TODO: should return index or page?
+  return page->allpagesindex;
+}
+int scfifo(){
+  struct proc *p = myproc();
+  struct mpage *current = p->queueRAM;
+  struct mpage *page = 0;
+  pte_t *pte;
 
+  while (current != 0){
+    pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
+    if ((*pte & PTE_A)){
+      *pte = *pte & ~PTE_A; // turn access bit off
+    } else { 
+      page = current;
+      break;
+    }
+    if (current->next == 0 && page == 0){
+      printf("loop: current = p->queueRAM\n");
+      current = p->queueRAM; // demonstrate a circular queue for scfifo logic
+    } 
+  }
+
+  if (page == 0) {
+    printf("page == 0 !!\n");
+    return -1;  
+  }
+  printf("va = %u   allpagesindex = %d\n", page->va, page->allpagesindex);
+  return page->allpagesindex;
+}
+
+int getpagetoreplace(){
+  // ///TODO: DELETE!! >>>>>>>>>>>>
+  // int i;
+  // for ( i = 31; i >= 0; i--)
+  // {
+  //   //printf("state is %d \n",myproc()->allpages[i].state);
+  //   if (myproc()->allpages[i].state == RAM)
+  //   {
+  //     //printf("found page to replace: %d\n",i);
+  //     return i;
+  //   }
+    
+  // }
+  // // <<<<<<<<<<<<<<<<<<<<<<<<<<
+  
+  #ifdef NONE
+    printf("getpagetoreplace(): error SELECTION=NONE\n");
+    return -1;
+  #endif
+  
+  #ifdef NFUA
+    printf("NFUA\n");
+    return nfua();
+  #endif
+  #ifdef LAPA
+    printf("LAPA\n");
+    return lapa();
+  #endif
+  #ifdef SCFIFO
+    printf("SCFIFO\n");
+    return scfifo();
+  #endif
+  
+  panic("getpagetoreplace: bad SELECTION"); // selected not valid, abort.
+  return -1;
+}
+
+int updatepagesage(struct proc* p){
+  struct mpage *page;
+  pte_t *pte;
+  int i;
+  for (i=0; i < MAX_TOTAL_PAGES; i++){
+    page = &p->allpages[i];
+    if (page->state == RAM){
+      // page is in RAM
+      page->access_counter = (page->access_counter >> 1);
+      pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
+      if ((*pte & PTE_A)){
+        page->access_counter &= (1L << 31); //TODO: right shift?
+
+        *pte= (*pte & ~PTE_A); // turn access bit off
+      }
+    }
+  }
   return 0;
 }
+
+int enqueueRAM(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  printf("enqueueRAM page=%p\n",page);
+  return 0;
+}
+
+struct mpage* dequeueRAM(){
+  printf("dequeueRAM start\n");
+  struct proc *p = myproc();
+  struct mpage *current;
+  struct mpage *page;
+  if (p->queueRAM == 0){
+    return 0;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+
+    page = current;
+    
+    if (p->queueRAM == current){
+      p->queueRAM = 0;
+    } else { 
+      current->prev->next = 0;
+    }
+  }
+  printf("  dequeueRAM page=%p\n",page);
+  return page;
+}
+
+int queueRAMremove(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      if (current == page){
+        if (p->queueRAM == current){
+          p->queueRAM = 0;
+        } else { 
+          current->prev->next = current->next ;
+        }
+      }
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  return 0;
+}
+
+
+// <<< Task 1
 
 // moving a physical given page to proc's swap file
 int physicpagetoswapfile(struct mpage* page){
@@ -734,10 +923,6 @@ int filetophysical(struct mpage* page) {
 }
 
 
-
-
-
-
 // Retrieving pages on demand (file to page)
 int retrievingpage (struct mpage* page){
   printf("in retrievingpage\n ");
@@ -803,73 +988,6 @@ int handlepagefault(){
 
   return 0;
 }
-
- 
-int enqueueRAM(struct mpage *page){
-  struct proc *p = myproc();
-  struct mpage *current;
-
-  if (p->queueRAM == 0){
-    p->queueRAM = page;
-  } else {
-    current = p->queueRAM;
-    while (current->next != 0)
-    {
-      current = current->next;
-    }
-    current->next = page; 
-  }
-  return 0;
-}
-
-int dequeueRAM(){
-  struct proc *p = myproc();
-  struct mpage *current;
-  struct mpage *page;
-  if (p->queueRAM == 0){
-    return -1;
-  } else {
-    current = p->queueRAM;
-    while (current->next != 0)
-    {
-      current = current->next;
-    }
-
-    page = current;
-    
-    if (p->queueRAM == current){
-      p->queueRAM = 0;
-    } else { 
-      current->prev->next = 0;
-    }
-  }
-  return page;
-}
-
-int queueRAMremove(struct mpage *page){
-  struct proc *p = myproc();
-  struct mpage *current;
-
-  if (p->queueRAM == 0){
-    p->queueRAM = page;
-  } else {
-    current = p->queueRAM;
-    while (current->next != 0)
-    {
-      if (current == page){
-        if (p->queueRAM == current){
-          p->queueRAM = 0;
-        } else { 
-          current->prev->next = current->next ;
-        }
-      }
-      current = current->next;
-    }
-    current->next = page; 
-  }
-  return 0;
-}
-
 
 
 

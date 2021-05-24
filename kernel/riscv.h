@@ -333,6 +333,7 @@ sfence_vma()
 #define PTE_U (1L << 4) // 1 -> user can access
 
 // Task 1
+#define PTE_A (1L << 6) // Accessed / reference bit TODO: is it already defined??
 #define PTE_PG (1L << 9) // Paged out to secondary storage 
 
 // shift a physical address to the right place for a PTE.
