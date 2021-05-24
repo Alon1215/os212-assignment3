@@ -328,6 +328,8 @@ fork(void)
     memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
     np->physcnumber = p->physcnumber;
     np->swapednumber = p->swapednumber;
+    deepcopyRAMqueue(p,np);
+
     //printf("in fork2.5\n");
     //deep copy of the swapped file
     if (p->swapFile!=0)

@@ -39,7 +39,7 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
-  //printf("in exec, before taask1 changes\n");//TODO delete
+  printf("in exec, before task1 changes\n");//TODO delete
   #ifndef NONE// clean pages data in proc
     //struct mapge *page;
     for (i=0; i < MAX_TOTAL_PAGES; i++){
