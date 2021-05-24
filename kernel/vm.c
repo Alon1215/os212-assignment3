@@ -687,6 +687,7 @@ int scfifo(){
       printf("loop: current = p->queueRAM\n");
       current = p->queueRAM; // demonstrate a circular queue for scfifo logic
     } 
+    current = current->next; 
   }
 
   if (page == 0) {
@@ -754,6 +755,9 @@ int updatepagesage(struct proc* p){
   return 0;
 }
 
+/*
+  queue implementation:
+*/
 int enqueueRAM(struct mpage *page){
   struct proc *p = myproc();
   struct mpage *current;
@@ -822,6 +826,19 @@ int queueRAMremove(struct mpage *page){
   return 0;
 }
 
+// Deep copy of RAM page's queue
+// to enrich fork() implementation
+int deepcopyRAMqueue (struct proc *p, struct proc *np){
+  int i;
+  for (i=0; i < MAX_TOTAL_PAGES; i++){
+    np->allpages[i].next = p->allpages[i].next;
+    np->allpages[i].prev = p->allpages[i].prev;    
+  }
+
+  np->queueRAM = &p->allpages[p->queueRAM->allpagesindex];
+}
+
+// >>> Task 2 END 
 
 // <<< Task 1
 
