@@ -393,7 +393,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
           break;
       }
     
-      //printf("set a new page in slot %d his va is %d \n",i,a);
+      printf("set a new page in slot %d his va is %d \n",i,a);
       page = &p->allpages[i]; 
       page->state = RAM;
       page->va = a;
@@ -674,9 +674,11 @@ int scfifo(){
   struct mpage *current = p->queueRAM;
   struct mpage *page = 0;
   pte_t *pte;
-
+  //printf(" in scfifo\n");//TODO delete
   while (current != 0){
-    pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
+    //printf("curr is %p\n",current);
+    pte = walk(p->pagetable,current->va, 0); ///TODO: add any checks here?
+     //printf("after walk  %p\n",current);
     if ((*pte & PTE_A)){
       *pte = *pte & ~PTE_A; // turn access bit off
     } else { 
@@ -694,7 +696,7 @@ int scfifo(){
     printf("page == 0 !!\n");
     return -1;  
   }
-  printf("va = %u   allpagesindex = %d\n", page->va, page->allpagesindex);
+  printf("chose page %p va = %u   allpagesindex = %d\n",page, page->va, page->allpagesindex);
   return page->allpagesindex;
 }
 
@@ -761,18 +763,21 @@ int updatepagesage(struct proc* p){
 int enqueueRAM(struct mpage *page){
   struct proc *p = myproc();
   struct mpage *current;
-
+  printf("head page=%p\n",p->queueRAM);
+  //printf("head next is %p\n",p->queueRAM->next);
   if (p->queueRAM == 0){
     p->queueRAM = page;
   } else {
     current = p->queueRAM;
     while (current->next != 0)
     {
+      //printf("curr is %p\n",current);
       current = current->next;
     }
     current->next = page; 
   }
-  printf("enqueueRAM page=%p\n",page);
+  //printf("enqueueRAM page=%p\n",page);
+  //printf("next is %p\n",page->next);
   return 0;
 }
 
@@ -804,25 +809,15 @@ struct mpage* dequeueRAM(){
 
 int queueRAMremove(struct mpage *page){
   struct proc *p = myproc();
-  struct mpage *current;
-
-  if (p->queueRAM == 0){
-    p->queueRAM = page;
+  //struct mpage *current;
+  printf(" in queueRAMremove\n");
+  if (p->queueRAM == page){
+    p->queueRAM = page->next;
   } else {
-    current = p->queueRAM;
-    while (current->next != 0)
-    {
-      if (current == page){
-        if (p->queueRAM == current){
-          p->queueRAM = 0;
-        } else { 
-          current->prev->next = current->next ;
-        }
-      }
-      current = current->next;
-    }
-    current->next = page; 
+    page->prev->next = page->next;
   }
+  page->prev=0;
+  page->next=0;
   return 0;
 }
 
@@ -836,6 +831,7 @@ int deepcopyRAMqueue (struct proc *p, struct proc *np){
   }
 
   np->queueRAM = &p->allpages[p->queueRAM->allpagesindex];
+  return 0;
 }
 
 // >>> Task 2 END 

@@ -13,7 +13,7 @@ int
 exec(char *path, char **argv)
 {
 
-  //printf("in exec b1 \n");//TODO delete
+  printf("in exec b1 \n");//TODO delete
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -49,6 +49,7 @@ exec(char *path, char **argv)
       page->va = -1; // check
       page->next = 0;
       page->prev = 0;
+      p->queueRAM =0;
 
     } 
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
@@ -61,7 +62,7 @@ exec(char *path, char **argv)
     }
     //p->swapFile = 0;
   #endif
-  //printf("in exec, after remove file\n");//TODO delete
+  printf("in exec, after remove file\n");//TODO delete
   
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
