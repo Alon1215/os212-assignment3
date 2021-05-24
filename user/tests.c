@@ -11,7 +11,7 @@ main(int argc, char *argv[])
     // for (int i = 0; i < 20; i++)
     // {
     //     //printf("before one\n");
-    sbrk(4096);
+    //        sbrk(4096);
     //     //printf("finished one\n");
     // }
     // int pid;
@@ -33,10 +33,12 @@ main(int argc, char *argv[])
     //TEST 2 - fork and child allocating 28 pages
     char in[3];
 int* pages[18];
+
+
   printf( "--------------------TEST 2:----------------------\n");
   printf( "-------------allocating 28 pages-----------------\n");
   if(fork() == 0){
-    for(int i = 0; i < 28; i++){
+    for(int i = 0; i < 29; i++){
         printf( "doing sbrk number %d\n", i);
         sbrk(PGSIZE);
     }
@@ -52,9 +54,10 @@ int* pages[18];
   printf("---------press enter to continue------------\n");
   gets(in,3);
   printf( "--------------------TEST 3:----------------------\n");
-  for(int i = 0; i < 18; i++){
+  for(int i = 0; i < 19; i++){
     printf( "i: %d\n", i);
     pages[i] = (int*)sbrk(PGSIZE);
+    printf("pages[i] is %d\n",pages[i]);
     *pages[i] = i;
   }
   printf( "--------father --> allocated_memory_pages: 16 paged_out: 6--------\n");
@@ -66,6 +69,7 @@ int* pages[18];
   printf( "--------------------TEST 4:----------------------\n");
   if(fork() == 0){
     for(int i = 0; i < 18; i++){
+        printf("pages[i] is %d\n",pages[i]);
         printf( "expected: %d, our output: %d\n",i,*pages[i]);
     }
     printf( "--------------expected: allocated_memory_pages: 16 paged_out: 6--------------\n");
