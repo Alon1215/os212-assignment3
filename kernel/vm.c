@@ -321,15 +321,16 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
-  if (myproc()->pid>2)
-  {
-    printf("%d in uvmalloc. process has %d physical and %d in file oldsz is %d \n",myproc()->pid,myproc()->physcnumber,myproc()->swapednumber,oldsz);//TODO delete
-  }
   char *mem;
   uint64 a;
   struct proc *p = myproc();
   //struct page *page;
 
+  if (p->pid > 2)
+  {
+    printf("%d in uvmalloc. process has %d physical and %d in file oldsz is %d \n",myproc()->pid,myproc()->physcnumber,myproc()->swapednumber,oldsz);//TODO delete
+  }
+  
   if(newsz < oldsz)
     return oldsz;
 
@@ -385,6 +386,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   //update all data structures we added a new page:
     if(p->pid>2){
       //find an empty slot in allpages and fill metadata:
+      struct mpage *page;
       int i;
       for ( i = 0; i < 32; i++)
       {
@@ -393,11 +395,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       }
     
       //printf("set a new page in slot %d his va is %d \n",i,a);
-      p->allpages[i].state = RAM;
-      p->allpages[i].va = a;
-      p->allpages[i].allpagesindex = i;
-      p->allpages[i].entriesarrayindex = -1;
+      page = &p->allpages[i]; 
+      page->state = RAM;
+      page->va = a;
+      page->allpagesindex = i;
+      page->entriesarrayindex = -1;
       p->physcnumber++;
+
+      enqueueRAM(page);
     }
     #endif
   }
@@ -677,38 +682,50 @@ int scfifo(){
       page = current;
       break;
     }
-    if (current->next == 0 && page == 0) current = p->queueRAM; // demonstrate a circular queue for scfifo logic
+    if (current->next == 0 && page == 0){
+      printf("loop: current = p->queueRAM\n");
+      current = p->queueRAM; // demonstrate a circular queue for scfifo logic
+    } 
   }
+
+  if (page == 0) {
+    printf("page == 0 !!\n");
+    return -1;  
+  }
+  printf("va = %u   allpagesindex = %d\n", page->va, page->allpagesindex);
   return page->allpagesindex;
 }
 
 int getpagetoreplace(){
-  ///TODO: DELETE!! >>>>>>>>>>>>
-  int i;
-  for ( i = 31; i >= 0; i--)
-  {
-    //printf("state is %d \n",myproc()->allpages[i].state);
-    if (myproc()->allpages[i].state == RAM)
-    {
-      //printf("found page to replace: %d\n",i);
-      return i;
-    }
+  // ///TODO: DELETE!! >>>>>>>>>>>>
+  // int i;
+  // for ( i = 31; i >= 0; i--)
+  // {
+  //   //printf("state is %d \n",myproc()->allpages[i].state);
+  //   if (myproc()->allpages[i].state == RAM)
+  //   {
+  //     //printf("found page to replace: %d\n",i);
+  //     return i;
+  //   }
     
-  }
-  // <<<<<<<<<<<<<<<<<<<<<<<<<<
+  // }
+  // // <<<<<<<<<<<<<<<<<<<<<<<<<<
   
-  #if SELECTION == NONE
+  #ifdef NONE
     printf("getpagetoreplace(): error SELECTION=NONE\n");
     return -1;
   #endif
   
-  #if SELECTION == NFUA
+  #ifdef NFUA
+    printf("NFUA\n");
     return nfua();
   #endif
-  #if SELECTION == LAPA
+  #ifdef LAPA
+    printf("LAPA\n");
     return lapa();
   #endif
-  #if SELECTION == SCFIFO
+  #ifdef SCFIFO
+    printf("SCFIFO\n");
     return scfifo();
   #endif
   
@@ -909,10 +926,12 @@ int enqueueRAM(struct mpage *page){
     }
     current->next = page; 
   }
+  printf("enqueueRAM page=%p\n",page);
   return 0;
 }
 
 struct mpage* dequeueRAM(){
+  printf("dequeueRAM start\n");
   struct proc *p = myproc();
   struct mpage *current;
   struct mpage *page;
@@ -933,6 +952,7 @@ struct mpage* dequeueRAM(){
       current->prev->next = 0;
     }
   }
+  printf("  dequeueRAM page=%p\n",page);
   return page;
 }
 

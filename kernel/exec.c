@@ -13,7 +13,8 @@ int
 exec(char *path, char **argv)
 {
 
-  //printf("in exec b1 \n");//TODO delete
+  printf("in exec b1 \n");//TODO delete
+
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -39,7 +40,7 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
-  //printf("in exec, before taask1 changes\n");//TODO delete
+  printf("in exec, before taask1 changes\n");//TODO delete
   #ifndef NONE// clean pages data in proc
     //struct mapge *page;
     for (i=0; i < MAX_TOTAL_PAGES; i++){
@@ -61,7 +62,7 @@ exec(char *path, char **argv)
     }
     //p->swapFile = 0;
   #endif
-  //printf("in exec, after remove file\n");//TODO delete
+  printf("in exec, after remove file\n");//TODO delete
   
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -89,6 +90,7 @@ exec(char *path, char **argv)
   p = myproc();
   uint64 oldsz = p->sz;
 
+  printf("in exec, before  Allocate two pages at the next page boundary\n");//TODO delete
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
@@ -100,6 +102,7 @@ exec(char *path, char **argv)
   sp = sz;
   stackbase = sp - PGSIZE;
 
+  printf("in exec, before  Push argument strings, prepare rest of stack in ustack\n");//TODO delete
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -132,7 +135,8 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
-    
+
+  printf("in exec, before Commit to the user image\n");//TODO delete    
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -144,6 +148,7 @@ exec(char *path, char **argv)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+  printf("in exec, before Commit to the user image\n");//TODO delete    
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(ip){
