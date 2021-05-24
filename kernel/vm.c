@@ -10,7 +10,7 @@
 #include "proc.h" // Task 1
 
 int enqueueRAM(struct mpage *);
-int dequeueRAM();
+struct mpage* dequeueRAM();
 int queueRAMremove(struct mpage *); 
 
 /*
@@ -87,8 +87,12 @@ kvminithart()
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
-  if(va >= MAXVA)
+  
+  if(va >= MAXVA){
+    printf("%d\n", va);
     panic("walk");
+  }
+    
 
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];
@@ -165,13 +169,21 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 
 //  ---Task 1 ----
 
-// // reset page meta data in mpage struct and proc's meta data fields
-// void resetpagemd(struct proc *p, struct mpage *page) {
-//   page->allpagesindex = -1;
-//   page->state = FREE;
-//   page->va = -1; // check
+// reset page meta data in mpage struct and proc's meta data fields
+void resetpagemd(struct proc *p, struct mpage *page) {
+  //printf(" in reset page\n");
+  if (page->state==RAM)
+    p->physcnumber--;
+  if (page->state==FILE){
+    p->swapednumber--;
+    p->fileentries[page->entriesarrayindex] = 0;
+  }
+  
+  page->allpagesindex = -1;
+  page->state = FREE;
+  page->va = -1; // check
 
-// }
+}
 
 // ---------------
 
@@ -181,45 +193,95 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 void
 uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 {
+  if (myproc()->pid>2)
+  {
+  printf("%d in uvmunmap. process has %d physical and %d in file  \n",myproc()->pid,myproc()->physcnumber,myproc()->swapednumber);//TODO delete
+  }
   uint64 a;
   pte_t *pte;
-
+  struct proc *p = myproc();
+  
   if((va % PGSIZE) != 0)
     panic("uvmunmap: not aligned");
-
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
+    if (p->pid>2)
+    {
+        //printf("need to clean from, va is %d pte_V is %d pte_pg is %d\n",a,(*pte & PTE_V),(*pte & PTE_PG));
+    }
     if((*pte & PTE_V) == 0){ // page is not in RAM, check if page is in swap file
-      if ((*pte & PTE_PG) == 0)
-        panic("uvmunmap: not mapped");
-      
+      //printf("not in ram pte_pg is %d:\n",(*pte & PTE_PG));
       #ifndef NONE
-     
-        struct proc *p = myproc();
-        struct mpage *page;
-        int i;
+      struct mpage *page;
+      int i;
+
+      //in case the page is in disk, we just need reset fields
+      //if the function was called from freeproc, there is no reason to reset the data of dead process
+      if (((*pte & PTE_PG) != 0) && (myproc()->pagetable == pagetable))
+      {
         for(i=0; i < MAX_TOTAL_PAGES; i++){
           page = &p->allpages[i];
-          if (page->va == va){ //found in file
+          //printf("page va is %d\n",page->va);
+          if (page->va == a){ //found in file
             goto found;
           }
         }
         panic("uvmunmap: not in file (but should be)");
 
-
         found:
           resetpagemd(p,page);
-          p->fileentries[page->entriesarrayindex] = 0;
-      
+          //printf("deleted va: %d from file\n",a);
+          continue;
+      }
+      //in case the page not in ram or in file
+      else if ((*pte & PTE_PG) == 0)
+        panic("uvmunmap: not mapped");
+
+      //if we reach this line, we handled a clean from file, so skip to next page
+      continue;
       #endif
+      panic("uvmunmap: not mapped");
     } 
-    ///TODO: if page in ram, any other action?
+    //printf("%d in uvmunmap nned to clean from ram\n",myproc()->pid);
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
+    else if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
+
+      #ifndef NONE
+      struct mpage *page;
+      int i;
+
+      //we have just freed a page from the ram, so now clean its metadata and bring page from file instead
+      if (p->pid >2 ){
+        for(i=0; i < MAX_TOTAL_PAGES; i++){
+          page = &p->allpages[i];
+          //printf("curr page va is: %d\n",page->va);
+          if (page->va == a){ 
+            //printf("found page to clean, %d\n",i);
+            resetpagemd(p,page);
+            //printf("deleted va: %d from ram\n",a);
+            break;
+          }
+        }
+        //if we are during a program, we may want to bring back a page from the file
+        if (p->pagetable == pagetable){
+          for ( i = 0; i < 32; i++)
+          {
+            if (p->allpages[i].state ==FILE)
+            {
+              //printf("made space in ram, now bring back a page\n");
+              filetophysical(&p->allpages[i]);
+              break;
+            }
+          }
+        }  
+      }
+      #endif
+      
+      
     }
     *pte = 0;
   }
@@ -259,8 +321,10 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
-
-  printf("in uvmalloc. process has %d physical and %d in file \n",myproc()->physcnumber,myproc()->swapednumber);//TODO delete
+  if (myproc()->pid>2)
+  {
+    printf("%d in uvmalloc. process has %d physical and %d in file oldsz is %d \n",myproc()->pid,myproc()->physcnumber,myproc()->swapednumber,oldsz);//TODO delete
+  }
   char *mem;
   uint64 a;
   struct proc *p = myproc();
@@ -271,69 +335,71 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += PGSIZE){
+    //printf("a is %d\n",a);
     #ifndef NONE
-    
       if (p->pid>2){
-        // printf("in uvmalloc in ifdef\n");//TODO delete
         //in case there are already 32 pages, return -1
         if ((p->physcnumber) + (p->swapednumber)==32)
-        {
           return 0 ;
-        }
         
-          //chaeck whether we need to make space for the new page in the ram.
+        //chaeck whether we need to make space for the new page in the ram.
         if (p->physcnumber == 16)
         {
-
           if (p->swapFile == 0)
           {
             createSwapFile(p);
+            printf("created swap file\n");
           }
           
           ///TODO: after implement getpagetoreplace, check what can it retrun.
+          //get a page to move to file from ram
           int ptomoveindex = getpagetoreplace();
+          //printf("got page to replace: %d\n",ptomoveindex);
           if (physicpagetoswapfile(&p->allpages[ptomoveindex])<0){
               // 0 indicates a failure in this function
               return 0;
-
           }
         }  
       }    
     
     #endif
+
     //now we know there is enough place on the ram for allocating a new page
-    //printf("in uvmalloc after ifdef\n");//TODO delete
     mem = kalloc();
     if(mem == 0){
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
+    
     memset(mem, 0, PGSIZE);
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-  }
-  //update all data structures we added a new page:
-  if(p->pid>2){
-    
-    //find an empty slot in allpages:
-    int i;
-    for ( i = 0; i < 32; i++)
-    {
-      if (p->allpages[i].state == FREE)
-      {
-        break;
-      }
-      
-    }
-    p->allpages[i].state = RAM;
-    p->allpages[i].va = a;
-    p->allpages[i].allpagesindex = i;
-    p->allpages[i].entriesarrayindex = -1;
-    p->physcnumber++;
+    //printf("pa is %p\n",mem);
+    //printf("pa is %p\n",walkaddr(p->pagetable,a));
+    //printf("va is %p\n",a);
 
+    #ifndef NONE
+  //update all data structures we added a new page:
+    if(p->pid>2){
+      //find an empty slot in allpages and fill metadata:
+      int i;
+      for ( i = 0; i < 32; i++)
+      {
+        if (p->allpages[i].state == FREE)
+          break;
+      }
+    
+      //printf("set a new page in slot %d his va is %d \n",i,a);
+      p->allpages[i].state = RAM;
+      p->allpages[i].va = a;
+      p->allpages[i].allpagesindex = i;
+      p->allpages[i].entriesarrayindex = -1;
+      p->physcnumber++;
+    }
+    #endif
   }
   return newsz;
 }
@@ -345,7 +411,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 uint64
 uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
-  printf("in uvmdeaaloc b1 \n");//TODO delete
   if(newsz >= oldsz)
     return oldsz;
 
@@ -397,6 +462,7 @@ int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
+  
   uint64 pa, i;
   uint flags;
   char *mem;
@@ -404,10 +470,26 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+    if((*pte & PTE_V) == 0){
+      //TASK1: also check if in file
+      #ifndef NONE
+      pte_t *np_pte;
+      if ((*pte & PTE_PG)==0) {
+        panic("uvmcopy: page not present");
+      }
+      //now we know its wrriten in the file, so need to update pte flags
+      //by default, the kernel treats missing ram pages as not allocated at all
+      flags = PTE_FLAGS(*pte);
+      if((np_pte = walk(new, i, 1)) == 0)
+        return -1;
+      *np_pte = *pte | flags ;
+      continue;
+      #endif
+        panic("uvmcopy: page not present");
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
+
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
@@ -547,8 +629,8 @@ uint64 countSetBits(unsigned int n)
 int nfua(){
   struct proc *p = myproc();
   struct mpage *current = p->queueRAM;
-  int minvalue;
-  struct mpage *page;
+  int minvalue = 0x7FFFFFFF; ///TODO: check, just max int
+  struct mpage *page = current;
   
   while (current != 0){
     // look for pages in RAM & compare to min value
@@ -558,20 +640,20 @@ int nfua(){
     }
   }
   ///TODO: should return index or page?
+  if (page == 0) return -1;
   return page->allpagesindex;
 }
 int lapa(){
   struct proc *p = myproc();
   struct mpage *current = p->queueRAM;
-  struct mpage *page;
-  int minvalue;
-  int minindex;
+  struct mpage *page = current;
+  int minvalue = 0x7FFFFFFF; ///TODO: check, just max int
   
   while (current != 0){
     // look for pages in RAM & compare
     if(current->va != 0 && current->entriesarrayindex == -1){
       if (countSetBits(current->access_counter) < countSetBits(minvalue) 
-      || (countSetBits(current->access_counter) == countSetBits(minvalue)) && current->access_counter < minvalue){
+      || ((countSetBits(current->access_counter) == countSetBits(minvalue)) && current->access_counter < minvalue)){
         minvalue = current->access_counter;
         page = current;
       }
@@ -590,7 +672,7 @@ int scfifo(){
   while (current != 0){
     pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
     if ((*pte & PTE_A)){
-      *pte & ~PTE_A; // turn access bit off
+      *pte = *pte & ~PTE_A; // turn access bit off
     } else { 
       page = current;
       break;
@@ -601,6 +683,20 @@ int scfifo(){
 }
 
 int getpagetoreplace(){
+  ///TODO: DELETE!! >>>>>>>>>>>>
+  int i;
+  for ( i = 31; i >= 0; i--)
+  {
+    //printf("state is %d \n",myproc()->allpages[i].state);
+    if (myproc()->allpages[i].state == RAM)
+    {
+      //printf("found page to replace: %d\n",i);
+      return i;
+    }
+    
+  }
+  // <<<<<<<<<<<<<<<<<<<<<<<<<<
+  
   #if SELECTION == NONE
     printf("getpagetoreplace(): error SELECTION=NONE\n");
     return -1;
@@ -620,74 +716,78 @@ int getpagetoreplace(){
   return -1;
 }
 
-// Adding a given page the proc's swap file
-int pagetoswapfile(struct mpage* page){
+// moving a physical given page to proc's swap file
+int physicpagetoswapfile(struct mpage* page){
+  //printf("in pagetoswapfile\n");
   struct proc* p = myproc();
   pte_t *pte;
-  int offset;
-  for (offset = 0; offset <= MAX_PSYC_PAGES; offset++){
-    if (!p->fileentries[offset]) goto found;
+  int fileIndex;
+  for (fileIndex = 0; fileIndex <= MAX_PSYC_PAGES; fileIndex++){
+    if (!p->fileentries[fileIndex]) goto found;
   }
 
-  printf("pagetoswapfile: No free entry in swao file\n");
+  printf("pagetoswapfile: No free entry in swap file\n");
   return -1;
 
   found:
-
+    //printf("found slot in file %d\n",fileIndex);
     
     pte  = walk(p->pagetable, page->va, 0);
-
+    uint64 pa = walkaddr(p->pagetable,page->va);
+    
     // Should we check the (PTE_P & *pte)?
     if (!pte){
       printf("pagetoswapfile: pte = 0\n");
       return -1;
     } 
-    
-    if(writeToSwapFile(p, (char *)page->va, (offset*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
-    
-    p->fileentries[offset] = 1;
+    //printf("write  page to file. va is %d \n",page->va);
+    //printf("write  page to file. pa is %p \n",walkaddr(p->pagetable,page->va));
+
+    if(writeToSwapFile(p, (char *)pa, (fileIndex*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
+    //printf("wrote  page to file\n");
+    p->fileentries[fileIndex] = 1;
     p->swapednumber++;
+    p->physcnumber--;
     page->state = FILE;
-    *pte = (*pte | PTE_PG) &~ PTE_V; // set PTE_PG flag up, and PTE_V down
+    
 
-  return 0;
-}
+    queueRAMremove(page);
+    kfree((void*)pa);
+    // TODO: is there anything else to do to release the pysic page?
+    *pte = (*pte | PTE_PG) &~ PTE_V; // important to change just after kfree!!!
 
-int physicpagetoswapfile(struct mpage* page) {
-
-  if (pagetoswapfile(page) == -1) return -1;
-  struct proc *p = myproc();
-  p->physcnumber--;
-  queueRAMremove(page);
-  kfree((char*)page->va);
-  // TODO: is there anything else to do to release the pysic page?
   return 0;
 }
 
 int filetophysical(struct mpage* page) {
-  char * va;
+  //char * va;
   uint64 pa;
   struct proc *p = myproc();
 
+  //printf("in filetophysical for page with va: %d \n",page->va);
   // allocate a new page in the physical memory 
-  if ((va = kalloc()) == 0){
+  if ((pa = (uint64)kalloc()) == 0){
     printf("retrievingpage: kalloc failed\n");
     return -1;
   } 
+
+  //printf("in filetophysical  after kalloc new va is %d \n",va);
   //archive the pa from the va we got in kalloc
   ///TODO: assure this is the right way to get pa.
-  if((pa = walkaddr(p->pagetable,(uint64)va))==0) 
-    return -1;
+  // if((pa = walkaddr(p->pagetable,(uint64)va))==0) 
+  //   return -1;
 
+  //printf("in filetophysical  before mapping \n");
   //we need to map the page va to the new physical memory we allocated. 
   ///TODO: decide what permissions we want.
   mappages(p->pagetable,page->va,PGSIZE,pa,PTE_R | PTE_W);
 
-
+  //printf("about to write page  with va : %d from file to ram!\n",page->va);
   // copy page to pa
-  if(readFromSwapFile(p,(char*)page->va,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
+  if(readFromSwapFile(p,(char*)pa,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
   }
+  //printf("wrote page  with va : %d from file to ram!\n",page->va);
   pte_t* pte;
 
   //get pte in the pagetable in order to set the flags
@@ -699,6 +799,9 @@ int filetophysical(struct mpage* page) {
   page->entriesarrayindex = -1;
   *pte = (*pte | PTE_V) &~ PTE_PG;
   enqueueRAM(page); // Add page to RAM queue
+  p->physcnumber++;
+  p->swapednumber--;
+
  
   return 0;
 }
@@ -778,17 +881,18 @@ int updatepagesage(struct proc* p){
   int i;
   for (i=0; i < MAX_TOTAL_PAGES; i++){
     page = &p->allpages[i];
-    if (page->entriesarrayindex == -1){
+    if (page->state == RAM){
       // page is in RAM
-      page->access_counter >> 1;
+      page->access_counter = (page->access_counter >> 1);
       pte = walk(p->pagetable,page->va, 0); ///TODO: add any checks here?
       if ((*pte & PTE_A)){
         page->access_counter &= (1L << 31); //TODO: right shift?
 
-        *pte & ~PTE_A; // turn access bit off
+        *pte= (*pte & ~PTE_A); // turn access bit off
       }
     }
   }
+  return 0;
 }
 
 int enqueueRAM(struct mpage *page){
@@ -808,12 +912,12 @@ int enqueueRAM(struct mpage *page){
   return 0;
 }
 
-int dequeueRAM(){
+struct mpage* dequeueRAM(){
   struct proc *p = myproc();
   struct mpage *current;
   struct mpage *page;
   if (p->queueRAM == 0){
-    return -1;
+    return 0;
   } else {
     current = p->queueRAM;
     while (current->next != 0)

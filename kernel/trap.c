@@ -68,14 +68,14 @@ usertrap(void)
     intr_on();
 
     syscall();
-
+  #ifndef NONE
   }else if(scause ==13 || scause == 15)
   {
     //printf("in trap 1\n");//TODO delete
     handlepagefault();
     
   
-  
+  #endif
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
