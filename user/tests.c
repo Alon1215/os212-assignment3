@@ -59,6 +59,7 @@ int* pages[18];
     pages[i] = (int*)sbrk(PGSIZE);
     printf("pages[i] is %d\n",pages[i]);
     *pages[i] = i;
+    printf("*pages[i] is %d\n",*pages[i]);
   }
   printf( "--------father --> allocated_memory_pages: 16 paged_out: 6--------\n");
   printf( "--------for our output press CTRL^P:--------\n");

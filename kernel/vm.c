@@ -645,7 +645,7 @@ int physicpagetoswapfile(struct mpage* page){
   return -1;
 
   found:
-   // printf("found slot in file %d\n",fileIndex);
+    printf("found slot in file %d\n",fileIndex);
     
     pte  = walk(p->pagetable, page->va, 0);
     uint64 pa = walkaddr(p->pagetable,page->va);
@@ -655,11 +655,19 @@ int physicpagetoswapfile(struct mpage* page){
       printf("pagetoswapfile: pte = 0\n");
       return -1;
     } 
-    //printf("write  page to file. va is %d \n",page->va);
-    //printf("write  page to file. pa is %p \n",walkaddr(p->pagetable,page->va));
+    printf("write  page to file. va is %d \n",page->va);
+    printf("write  page to file. pa is %p \n",walkaddr(p->pagetable,page->va));
 
-    if(writeToSwapFile(p, (char *)pa, (fileIndex*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
+    if(writeToSwapFile(p, (char*)pa, fileIndex*PGSIZE, PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
     //printf("wrote  page to file\n");
+    //TODO delete
+    char buffer2[128] = "mama";
+     char buffer[128];
+    
+    readFromSwapFile(p, buffer, (fileIndex*PGSIZE), sizeof(buffer));
+    printf("werote: %s\n",buffer);
+    printf("werote: %s\n",buffer2);
+    //
     p->fileentries[fileIndex] = 1;
     p->swapednumber++;
     p->physcnumber--;
@@ -701,7 +709,7 @@ int filetophysical(struct mpage* page) {
 
   printf("about to write page  with va : %d from file to ram!\n",page->va);
   // copy page to pa
-  if(readFromSwapFile(p,(char*)pa,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
+  if(readFromSwapFile(p,(char*)page->va,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
   }
   printf("wrote page  with va : %d from file to ram!\n",page->va);
