@@ -23,6 +23,7 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -31,17 +32,17 @@ exec(char *path, char **argv)
   }
   ilock(ip);
 
-  // Check ELF header
-  if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
-    goto bad;
-  if(elf.magic != ELF_MAGIC)
-    goto bad;
-
-  if((pagetable = proc_pagetable(p)) == 0)
-    goto bad;
-  //printf("in exec, before taask1 changes\n");//TODO delete
   #ifndef NONE// clean pages data in proc
     //struct mapge *page;
+    struct mpage allpagesBu[MAX_TOTAL_PAGES];
+    char fileentriesBu[17];
+    int physcnumberBu =0;
+    physcnumberBu= p->physcnumber;                        
+    int swapednumberBu = p ->swapednumber;
+    struct mpage *queueRAMBu = p->queueRAM;
+    memmove(&allpagesBu,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
+    memmove(&fileentriesBu,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
+
     for (i=0; i < MAX_TOTAL_PAGES; i++){
       struct mpage *page =  &p->allpages[i];
       page-> allpagesindex = -1;
@@ -55,14 +56,21 @@ exec(char *path, char **argv)
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
     p->physcnumber = 0;
     p->swapednumber = 0;
-    if(p->swapFile!=0){
-      //printf("in exec, before remove file\n");//TODO delete
-      removeSwapFile(p);
-      p->swapFile = 0;
-    }
+    
     //p->swapFile = 0;
   #endif
   printf("in exec, after remove file\n");//TODO delete
+  
+
+  // Check ELF header
+  if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
+    goto bad;
+  if(elf.magic != ELF_MAGIC)
+    goto bad;
+
+  if((pagetable = proc_pagetable(p)) == 0)
+    goto bad;
+  //printf("in exec, before taask1 changes\n");//TODO delete
   
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -142,7 +150,13 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
-
+  #ifndef NONE
+    if(p->swapFile!=0){
+      //printf("in exec, before remove file\n");//TODO delete
+      removeSwapFile(p);
+      p->swapFile = 0;
+    }
+  #endif
   
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
@@ -154,6 +168,14 @@ exec(char *path, char **argv)
     iunlockput(ip);
     end_op();
   }
+  #ifndef NONE
+    memmove(&p->allpages,&allpagesBu,sizeof(struct mpage) * MAX_TOTAL_PAGES);
+    memmove(&p->fileentries,&fileentriesBu,sizeof(char) * MAX_TOTAL_PAGES);
+    p->swapednumber = swapednumberBu;
+    p->physcnumber = physcnumberBu;
+    p->queueRAM = queueRAMBu;
+  #endif
+
   return -1;
 }
 
