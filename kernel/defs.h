@@ -189,6 +189,7 @@ int             copyinstr(pagetable_t, char *, uint64, uint64);
 int             handlepagefault(void);
 int             getpagetoreplace(void);
 int             physicpagetoswapfile( struct mpage* );
+int             filetophysical(struct mpage* );
 
 // plic.c
 void            plicinit(void);

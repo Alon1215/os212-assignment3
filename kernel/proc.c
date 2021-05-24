@@ -145,11 +145,9 @@ found:
   // <<< Task 1
   // initiate values:
   #ifndef NONE
-  
-      
-    
     p->physcnumber = 0;
     p->swapednumber = 0;
+    p->swapFile =0;
     
     int i;
     for (i = 0; i <= MAX_PSYC_PAGES; i++){
@@ -281,7 +279,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
-
+  //printf("in growproc old sz is %d\n",p->sz);//delete
   sz = p->sz;
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
@@ -290,6 +288,7 @@ growproc(int n)
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+  //printf("in growproc new sz is %d\n",sz);//delete
   p->sz = sz;
   return 0;
 }
@@ -321,36 +320,37 @@ fork(void)
   #ifndef NONE
   if ( p->pid>2)
   {
-    //printf("in fork2\n");
+    printf("in fork2\n");
     //copy all proc fields
     memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
     memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
     np->physcnumber = p->physcnumber;
     np->swapednumber = p->swapednumber;
-
+    //printf("in fork2.5\n");
     //deep copy of the swapped file
-    ///TODO: maybe its impossible to crate a very big buffer like here, maybe split
     if (p->swapFile!=0)
     {
-      char buff[1];
-  for (uint offset = 0; readFromSwapFile(p, buff, offset, 1) != -1; offset += 1, memset(buff, 0 , 1))
-  {
-    if (writeToSwapFile(np, buff, offset, 1) == -1)
-    {
-      panic("failed to copy swapFile");
+      release(&np->lock);
+      createSwapFile(np);
+      char buffer[1024];
+      uint64 offset =0;
+      memset(buffer, 0, sizeof(buffer));
+      int iter = 0;
+      while(readFromSwapFile(p, buffer, offset, sizeof(buffer)) != -1 && iter<70 ){
+        //printf("i");
+        if(writeToSwapFile(np, buffer, offset, sizeof(buffer)) == -1){
+          //panic("failed in copyProcesses\n");
+          break;
+        }
+        offset+= sizeof(buffer);
+        memset(buffer, 0, sizeof(buffer));
+        iter++;
+      }
+      acquire(&np->lock);
+      //printf("in fork3\n");
     }
-    }
-    
-    
-  }
-
-
   }
   #endif
-  
-
-
-
   //---------------------////////
 
   // copy saved user registers.
@@ -403,7 +403,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
-  printf("in exit\n");
+  //printf("in exit\n");
   struct proc *p = myproc();
 
   if(p == initproc)
@@ -424,10 +424,6 @@ exit(int status)
   {
     removeSwapFile(p);
   }
-  
-  
-    
-  
   #endif
   ////////////////////
   

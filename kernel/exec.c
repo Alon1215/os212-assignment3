@@ -39,7 +39,27 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
+  //printf("in exec, before taask1 changes\n");//TODO delete
+  #ifndef NONE// clean pages data in proc
+    //struct mapge *page;
+    for (i=0; i < MAX_TOTAL_PAGES; i++){
+      struct mpage *page =  &p->allpages[i];
+      page-> allpagesindex = -1;
+      page-> state = FREE;
+      page->va = -1; // check
 
+    } 
+    for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
+    p->physcnumber = 0;
+    p->swapednumber = 0;
+    if(p->swapFile!=0){
+      //printf("in exec, before remove file\n");//TODO delete
+      removeSwapFile(p);
+      p->swapFile = 0;
+    }
+    //p->swapFile = 0;
+  #endif
+  //printf("in exec, after remove file\n");//TODO delete
   
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -119,23 +139,8 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
-  #ifndef NONE// clean pages data in proc
-    //struct mapge *page;
-    for (i=0; i < MAX_TOTAL_PAGES; i++){
-      struct mpage *page =  &p->allpages[i];
-      page-> allpagesindex = -1;
-      page-> state = FREE;
-      page->va = -1; // check
 
-    } 
-    for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
-    p->physcnumber = 0;
-    p->swapednumber = 0;
-    if(p->swapFile!=0){
-      removeSwapFile(p);
-    }
-    //p->swapFile = 0;
-  #endif
+  
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
