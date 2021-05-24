@@ -696,7 +696,7 @@ int scfifo(){
     printf("page == 0 !!\n");
     return -1;  
   }
-  printf("chose page %p va = %u   allpagesindex = %d\n",page, page->va, page->allpagesindex);
+  printf("chose page %p va = %d   allpagesindex = %d\n",page, page->va, page->allpagesindex);
   return page->allpagesindex;
 }
 
@@ -774,8 +774,10 @@ int enqueueRAM(struct mpage *page){
       //printf("curr is %p\n",current);
       current = current->next;
     }
-    current->next = page; 
+    current->next = page;
+    page->prev = current; 
   }
+
   //printf("enqueueRAM page=%p\n",page);
   //printf("next is %p\n",page->next);
   return 0;
@@ -812,12 +814,16 @@ int queueRAMremove(struct mpage *page){
   //struct mpage *current;
   printf(" in queueRAMremove\n");
   if (p->queueRAM == page){
+    printf(" p->queueRAM == page\n");
     p->queueRAM = page->next;
   } else {
+    printf(" page->prev->next = page->next\n");
+    printf("prev=%p next=%p\n", page->prev, page->next);
     page->prev->next = page->next;
   }
   page->prev=0;
   page->next=0;
+    printf(" queueRAMremove END\n");
   return 0;
 }
 
@@ -826,11 +832,11 @@ int queueRAMremove(struct mpage *page){
 int deepcopyRAMqueue (struct proc *p, struct proc *np){
   int i;
   for (i=0; i < MAX_TOTAL_PAGES; i++){
-    np->allpages[i].next = p->allpages[i].next;
-    np->allpages[i].prev = p->allpages[i].prev;    
+    if(p->allpages[i].next) np->allpages[i].next = &np->allpages[p->allpages[i].next->allpagesindex];
+    if(p->allpages[i].prev) np->allpages[i].prev = &np->allpages[p->allpages[i].prev->allpagesindex];
   }
 
-  np->queueRAM = &p->allpages[p->queueRAM->allpagesindex];
+  if(p->queueRAM) np->queueRAM = &np->allpages[p->queueRAM->allpagesindex];
   return 0;
 }
 

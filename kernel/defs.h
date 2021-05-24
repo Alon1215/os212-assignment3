@@ -192,6 +192,7 @@ int             filetophysical(struct mpage* );
 int             updatepagesage(struct proc*);
 //Task 2
 int             getpagetoreplace(void);
+int             deepcopyRAMqueue (struct proc *, struct proc *);
 
 // plic.c
 void            plicinit(void);
