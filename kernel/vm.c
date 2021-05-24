@@ -8,6 +8,11 @@
 #include "spinlock.h" // Task 1
 
 #include "proc.h" // Task 1
+
+int enqueueRAM(struct mpage *);
+int dequeueRAM();
+int queueRAMremove(struct mpage *); 
+
 /*
  * the kernel's page table.
  */
@@ -664,9 +669,8 @@ int physicpagetoswapfile(struct mpage* page){
     p->swapednumber++;
     p->physcnumber--;
     page->state = FILE;
-    
 
-    
+    queueRAMremove(page);
     kfree((void*)pa);
     // TODO: is there anything else to do to release the pysic page?
     *pte = (*pte | PTE_PG) &~ PTE_V; // important to change just after kfree!!!
@@ -719,6 +723,7 @@ int filetophysical(struct mpage* page) {
   p->physcnumber++;
   p->swapednumber--;
 
+  enqueueRAM(page); // Add page to RAM queue
   // printf("va is %d\n",page->va);
   // pte = walk(p->pagetable,page->va, 0);
   // printf("pte_v is %d\n",PTE_V & *pte); 
@@ -799,6 +804,71 @@ int handlepagefault(){
   return 0;
 }
 
+ 
+int enqueueRAM(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  return 0;
+}
+
+int dequeueRAM(){
+  struct proc *p = myproc();
+  struct mpage *current;
+  struct mpage *page;
+  if (p->queueRAM == 0){
+    return -1;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      current = current->next;
+    }
+
+    page = current;
+    
+    if (p->queueRAM == current){
+      p->queueRAM = 0;
+    } else { 
+      current->prev->next = 0;
+    }
+  }
+  return page;
+}
+
+int queueRAMremove(struct mpage *page){
+  struct proc *p = myproc();
+  struct mpage *current;
+
+  if (p->queueRAM == 0){
+    p->queueRAM = page;
+  } else {
+    current = p->queueRAM;
+    while (current->next != 0)
+    {
+      if (current == page){
+        if (p->queueRAM == current){
+          p->queueRAM = 0;
+        } else { 
+          current->prev->next = current->next ;
+        }
+      }
+      current = current->next;
+    }
+    current->next = page; 
+  }
+  return 0;
+}
 
 
 

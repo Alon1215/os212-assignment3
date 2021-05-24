@@ -47,6 +47,8 @@ exec(char *path, char **argv)
       page-> allpagesindex = -1;
       page-> state = FREE;
       page->va = -1; // check
+      page->next = 0;
+      page->prev = 0;
 
     } 
     for (i=0; i < MAX_PSYC_PAGES; i++) p->fileentries[i] = 0;
