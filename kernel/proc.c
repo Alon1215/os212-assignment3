@@ -322,7 +322,7 @@ fork(void)
   #ifndef NONE
   if ( p->pid>2)
   {
-    printf("in fork2\n");
+    //printf("in fork2\n");
     //copy all proc fields
     memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
     memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
@@ -536,7 +536,20 @@ scheduler(void)
 
         // <<< Task 2
         ///TODO: what is a valid way to check SELECTION
-        updatepagesage(p); // if relevant, update age counter
+        #ifdef NFUA 
+        if (p->pid >2)
+        {
+          updatepagesage(p); // if relevant, update age counter
+        }
+        
+        
+        #endif
+        #ifdef LAPA 
+        if (p->pid >2)
+        {
+          updatepagesage(p); // if relevant, update age counter
+        }
+        #endif
 
         // >>> Task 2 END
         // Process is done running for now.
