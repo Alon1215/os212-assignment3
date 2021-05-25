@@ -400,9 +400,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       page->allpagesindex = i;
       page->entriesarrayindex = -1;
       p->physcnumber++;
+      #ifdef NFUA
+        page->access_counter = 0;
+      #elif LAPA
+        page->access_counter = 0xFFFFFFFF;
+      #endif
 
       ///TODO: should be >2, btu since the read\ write to file dosnt work, is >3.
-      if (page->allpagesindex>3 )
+      if (page->allpagesindex>=4 )
       {
          enqueueRAM(page);
       }
@@ -707,7 +712,7 @@ int scfifo(){
     printf("page == 0 !!\n");
     return -1;  
   }
-  printf("chose page %p va = %d   allpagesindex = %d\n",page, page->va, page->allpagesindex);
+  //printf("chose page %p va = %d   allpagesindex = %d\n",page, page->va, page->allpagesindex);
   return page->allpagesindex;
 }
 
@@ -873,7 +878,7 @@ int physicpagetoswapfile(struct mpage* page){
   return -1;
 
   found:
-   // printf("found slot in file %d\n",fileIndex);
+    //printf("------------------------------------------found slot in file %d\n",fileIndex);
     
     pte  = walk(p->pagetable, page->va, 0);
     uint64 pa = walkaddr(p->pagetable,page->va);
@@ -886,15 +891,27 @@ int physicpagetoswapfile(struct mpage* page){
     //printf("write  page to file. va is %d \n",page->va);
     //printf("write  page to file. pa is %p \n",walkaddr(p->pagetable,page->va));
 
+      
+
+    
     if(writeToSwapFile(p, (char *)pa, (fileIndex*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
     printf("wrote  page to file, index in all pages is %d\n",page->allpagesindex);
+    // char buff[1024];
+    // char buff2[1024] = "mochaeli";
+    // memset(buff, 0, sizeof(buff));
+    // readFromSwapFile(p, buff, fileIndex*PGSIZE, sizeof(buff));
+    // printf("buffer is %d\n",buff);
+    // printf("buffer2 is %s\n",buff2);
     p->fileentries[fileIndex] = 1;
     p->swapednumber++;
     p->physcnumber--;
     page->state = FILE;
+    page->entriesarrayindex = fileIndex;
 
     queueRAMremove(page);
     kfree((void*)pa);
+    
+    sfence_vma();
     // TODO: is there anything else to do to release the pysic page?
     *pte = (*pte | PTE_PG) &~ PTE_V; // important to change just after kfree!!!
 
@@ -926,7 +943,7 @@ int filetophysical(struct mpage* page) {
   ///TODO: decide what permissions we want.
   mappages(p->pagetable,page->va,PGSIZE,(uint64)pa,PTE_W|PTE_X|PTE_R|PTE_U);
 
-  //printf("about to write page  with va : %d from file to ram!\n",page->va);
+  //printf("about to read page  with va : %d to %p from file to ram! index is %d\n",page->va,pa,page->entriesarrayindex);
   // copy page to pa
   if(readFromSwapFile(p,(char*)pa,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
@@ -945,7 +962,11 @@ int filetophysical(struct mpage* page) {
   *pte = (*pte | PTE_V) &~ PTE_PG;
   p->physcnumber++;
   p->swapednumber--;
-  page->access_counter = 0;
+  #ifdef NFUA
+        page->access_counter = 0;
+  #elif LAPA
+        page->access_counter = 0xFFFFFFFF;
+  #endif
 
   enqueueRAM(page); // Add page to RAM queue
   // printf("va is %d\n",page->va);
