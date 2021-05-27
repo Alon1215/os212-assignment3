@@ -13,7 +13,7 @@ int
 exec(char *path, char **argv)
 {
 
-  printf("in exec b1 \n");//TODO delete
+  // printf("in exec b1 \n");//TODO delete
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -59,7 +59,7 @@ exec(char *path, char **argv)
     
     //p->swapFile = 0;
   #endif
-  printf("in exec, after remove file\n");//TODO delete
+  // printf("in exec, after remove file\n");//TODO delete
   
 
   // Check ELF header

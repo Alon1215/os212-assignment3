@@ -69,7 +69,7 @@ usertrap(void)
 
     syscall();
   #ifndef NONE
-  }else if(scause ==13 || scause == 15)
+  }else if(scause ==13 || scause == 15|| scause == 12)
   {
     if (r_stval()>p->sz)
     {
