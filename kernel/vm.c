@@ -237,7 +237,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       //if we reach this line, we handled a clean from file, so skip to next page
       continue;
       #endif
-      panic("uvmunmap: not mapped");
+      // panic("uvmunmap: not mapped"); //TODO: temporary disabled.
     } 
     //printf("%d in uvmunmap nned to clean from ram\n",myproc()->pid);
     if(PTE_FLAGS(*pte) == PTE_V)
@@ -327,7 +327,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   // }
   char *mem;
   uint64 a;
-  
+  // pte_t* pte;
+
   //struct page *page;
 
   if(newsz < oldsz)
@@ -882,7 +883,7 @@ int physicpagetoswapfile(struct mpage* page){
     pte  = walk(p->pagetable, page->va, 0);
     uint64 pa = PTE2PA(*pte);
     
-    // Should we check the (PTE_P & *pte)?
+    ///TODO:Should we check the (PTE_P & *pte)?
     if (!pte){
       printf("pagetoswapfile: pte = 0\n");
       return -1;
