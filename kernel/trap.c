@@ -68,25 +68,27 @@ usertrap(void)
     intr_on();
 
     syscall();
-  #ifndef NONE
-  }else if(scause ==13 || scause == 15|| scause == 12)
+  // #ifndef NONE
+  }else if(scause == 13 || scause == 15|| scause == 12)
   {
-    if (r_stval()>p->sz)
-    {
-      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
-    }
+    printf("in trap 1\n");//TODO delete
+
+    // if (r_stval()>p->sz)
+    // {
+    //   printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    //   printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    //   p->killed = 1;
+    // }
     
-    //printf("in trap 1\n");//TODO delete
+    
     handlepagefault();
     
   
-  #endif
+  // #endif
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    //printf("in else in trap 1\n");//TODO delete
+    printf("in else in trap 1 scause %d\n",scause);//TODO delete
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

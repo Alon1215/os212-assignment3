@@ -281,7 +281,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
-  //printf("in growproc old sz is %d\n",p->sz);//delete
+  printf("in growproc old sz is %d\n",p->sz);//delete
   sz = p->sz;
   
   // ------ Original implementation ------
@@ -297,9 +297,9 @@ growproc(int n)
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   // ----Task 4 END ---
-  
-  //printf("in growproc new sz is %d\n",sz);//delete
-  p->sz = sz;
+
+  printf("in growproc new sz is %d\n",sz);//delete
+  p->sz = sz + n;
   return 0;
 }
 

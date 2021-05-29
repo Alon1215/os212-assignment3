@@ -1018,13 +1018,29 @@ int handlepagefault(){
   struct proc *p = myproc();
   //retreive adress caused pagefault. we saved each page with the va of the start of the page
   uint64 va_fault = PGROUNDDOWN(r_stval());
-  pte_t* pte; 
+  // pte_t* pte;
+
   printf("\n-----------------PAGEFAULT-----------------\n\n");
   
+  // Case 1
+  if (r_stval()>p->sz)
+  {
+    printf("r_stval()>p->sz \n  %d > %d\n\n",r_stval(), p->sz); ///TODO:delete
+
+    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    p->killed = 1;
+    return -1;
+  }
+
+  #ifndef NONE
+
+  pte_t* pte;
+
   if ((pte = walk(p->pagetable,va_fault,0)) < 0){
     return -1;
   } 
-  printf("va_fault is %d sz is %d\n",va_fault,p->sz);
+  // printf("va_fault is %d sz is %d\n",va_fault,p->sz);
 
   //check if page is in file
   if (!(*pte & PTE_V) && (*pte & PTE_PG))
@@ -1038,7 +1054,14 @@ int handlepagefault(){
     panic("page caused fault wasnt found");
     found:
       retrievingpage(&p->allpages[i]);
-  } else {
+  } 
+    
+  #endif
+
+
+  else {
+    printf("r_stval() <= p->sz\n  %d <= %d\n\n",r_stval(), p->sz); ///TODO:delete
+
     // faulting address <= proccess size   ->   lazy allocation:
     uvmalloc(p->pagetable, va_fault, va_fault + PGSIZE);
   }
