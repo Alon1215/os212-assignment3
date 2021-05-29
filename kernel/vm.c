@@ -339,12 +339,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
       struct proc *p = myproc();
       if (p->pid>2){
-        //in case there are already 32 pages, return -1
-        if ((p->physcnumber) + (p->swapednumber)==32)
-          return 0 ;
+
+        ///TODO: why not comparing a/PGSIZE >= MAX_TOTAL_PAGES instead? makes more sense
+        //In case there are already 32 pages, return 0  
+        if ((p->physcnumber) + (p->swapednumber) >= MAX_TOTAL_PAGES) return 0;
         
-        //chaeck whether we need to make space for the new page in the ram.
-        if (p->physcnumber == 16)
+        //Check if we need to make space for the new page in the ram.
+        if (p->physcnumber >= MAX_PSYC_PAGES)
         {
           if (p->swapFile == 0)
           {
@@ -352,7 +353,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
             //printf("created swap file\n");
           }
           
-          ///TODO: after implement getpagetoreplace, check what can it retrun.
           //get a page to move to file from ram
           int ptomoveindex = getpagetoreplace();
           printf("got page to replace: %d\n",ptomoveindex);
@@ -378,9 +378,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    //printf("pa is %p\n",mem);
-    //printf("pa is %p\n",walkaddr(p->pagetable,a));
-    //printf("va is %p\n",a);
+   
 
     #ifndef NONE
   //update all data structures we added a new page:
@@ -1022,37 +1020,28 @@ int handlepagefault(){
   uint64 va_fault = PGROUNDDOWN(r_stval());
   pte_t* pte; 
   printf("\n-----------------PAGEFAULT-----------------\n\n");
+  
   if ((pte = walk(p->pagetable,va_fault,0)) < 0){
     return -1;
   } 
   printf("va_fault is %d sz is %d\n",va_fault,p->sz);
 
-  //printf("pte is %d\n",pte);
-  //check if the pte valid flag is down and file flagis up
+  //check if page is in file
   if (!(*pte & PTE_V) && (*pte & PTE_PG))
   {
-    //printf("page is in file\n");
     int i;
     //find the page caused pagefault and swap it to the RAM
     for ( i = 0; i < MAX_TOTAL_PAGES; i++)
     {
-      //printf("allpages[i] va is %d\n",p->allpages[i].va);
-      if(p->allpages[i].va == va_fault){
-        //printf("found page  in list\n");
-        break;
-      }
+      if(p->allpages[i].va == va_fault) goto found;
     }
-    if (i == MAX_TOTAL_PAGES){
-      panic("page caused fault wasnt found");
-    }
-    retrievingpage(&p->allpages[i]);
+    panic("page caused fault wasnt found");
+    found:
+      retrievingpage(&p->allpages[i]);
+  } else {
+    // faulting address <= proccess size   ->   lazy allocation:
+    uvmalloc(p->pagetable, va_fault, va_fault + PGSIZE);
   }
-  ///TODO: how can we detect segmentation fault? and hoe to handle this case???
-  //--seg fault--//
-
-
-
-  //
 
   return 0;
 }

@@ -283,13 +283,21 @@ growproc(int n)
   struct proc *p = myproc();
   //printf("in growproc old sz is %d\n",p->sz);//delete
   sz = p->sz;
-  if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
-      return -1;
-    }
-  } else if(n < 0){
+  
+  // ------ Original implementation ------
+  // if(n > 0){
+  //   if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+  //     return -1;
+  //   }
+  // } else if(n < 0){
+  //   sz = uvmdealloc(p->pagetable, sz, sz + n);
+  // }
+  // ---- Task 4 - Lazy implementaion ----
+  if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+  // ----Task 4 END ---
+  
   //printf("in growproc new sz is %d\n",sz);//delete
   p->sz = sz;
   return 0;
