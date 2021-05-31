@@ -651,6 +651,7 @@ int nfua(){
   struct mpage *page = 0;
   
   while (current){
+    printf("curr: va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
     // look for pages in RAM & compare to min value
     if( current->state == RAM && current->access_counter < minvalue){
       printf("found page with minimal. va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
@@ -687,34 +688,38 @@ int lapa(){
 int scfifo(){
   struct proc *p = myproc();
   struct mpage *current = p->queueRAM;
-  struct mpage *page = 0;
+  struct mpage *temp_page = 0;
   pte_t *pte;
   //printf(" in scfifo curr.next pta is %d\n",PTE_A & *walk(p->pagetable,current->next->va, 0));//TODO delete
-  while (current != 0){
+  while (1){
     //printf("curr va is %d\n",current->va);
     pte = walk(p->pagetable,current->va, 0); ///TODO: add any checks here?
      //printf("after walk  %p\n",current);
     if ((*pte & PTE_A)){
       printf("pte_a was on for page index: %d with va %d\n",current->allpagesindex,current->va);
       *pte = *pte & ~PTE_A; // turn access bit off
+      temp_page = current;
+      current = current->next;
+      queueRAMremove(temp_page);
+      enqueueRAM(temp_page);
     } else { 
-      page = current;
+      printf("pte_a was off!!!!! for page index: %d with va %d\n",current->allpagesindex,current->va);
       break;
     }
-    if (current->next == 0 && page == 0){
-      //printf("loop: current = p->queueRAM\n");
-      current = p->queueRAM; // demonstrate a circular queue for scfifo logic
-      continue;
-    } 
-    current = current->next; 
+    // if (current->next == 0 && page == 0){
+    //   //printf("loop: current = p->queueRAM\n");
+    //   current = p->queueRAM; // demonstrate a circular queue for scfifo logic
+    //   continue;
+    // } 
+    //current = current->next; 
   }
 
-  if (page == 0) {
+  if (current == 0) {
     printf("page == 0 !!\n");
     return -1;  
   }
-  printf("chose page %p va = %d   allpagesindex = %d\n",page, page->va, page->allpagesindex);
-  return page->allpagesindex;
+  printf("chose page %p va = %d   allpagesindex = %d\n",current, current->va, current->allpagesindex);
+  return current->allpagesindex;
 }
 
 int getpagetoreplace(){
