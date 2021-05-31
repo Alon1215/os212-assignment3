@@ -34,7 +34,7 @@ sparse_memory(char *s)
 
   exit(0);
 }
-
+ 
 void
 sparse_memory_unmap(char *s)
 {

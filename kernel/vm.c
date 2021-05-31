@@ -187,8 +187,46 @@ void resetpagemd(struct proc *p, struct mpage *page) {
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
 void
+uvmunmap_lazy(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
+{
+  uint64 a;
+  pte_t *pte;
+
+  if((va % PGSIZE) != 0)
+    panic("uvmunmap: not aligned");
+
+  for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+    if((pte = walk(pagetable, a, 0)) == 0)
+      // panic("uvmunmap: walk");
+      continue;
+    // if (*pte == 0)
+    //   continue;
+    if((*pte & PTE_V) == 0){
+      // *pte = 0;
+      continue;
+    }
+      // panic("uvmunmap: not mapped");
+      
+    if(PTE_FLAGS(*pte) == PTE_V)
+      panic("uvmunmap: not a leaf");
+    if(do_free){
+      // printf("in dofree\n"); //TODO delete
+      uint64 pa = PTE2PA(*pte);
+      kfree((void*)pa);
+    }
+    *pte = 0;
+  }
+}
+
+
+
+void
 uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 {
+  #ifdef NONE
+    return uvmunmap_lazy(pagetable, va, npages, do_free);
+  #endif
+  
   // if (myproc()->pid>2)
   // {
   // printf("%d in uvmunmap with %d pages do delete. process has %d physical and %d in file  \n",myproc()->pid,myproc()->physcnumber,npages,myproc()->swapednumber);//TODO delete
@@ -319,8 +357,40 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
+uvmalloc_lazy(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+{
+  char *mem;
+  uint64 a;
+
+  if(newsz < oldsz)
+    return oldsz;
+
+  oldsz = PGROUNDUP(oldsz);
+  for(a = oldsz; a < newsz; a += PGSIZE){
+    mem = kalloc();
+    if(mem == 0){
+      uvmdealloc(pagetable, a, oldsz);
+      return 0;
+    }
+    memset(mem, 0, PGSIZE);
+    if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+      kfree(mem);
+      uvmdealloc(pagetable, a, oldsz);
+      return 0;
+    }
+  }
+  return newsz;
+}
+
+uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
+  // in order to implement Task 4 (implementation with / without paging)
+  #ifdef NONE
+    return uvmalloc_lazy(pagetable, oldsz, newsz);
+  #endif
+
+
   // if (myproc()->pid>2)
   // {
   //   printf("%d in uvmalloc. process has %d physical and %d in file oldsz is %d \n",myproc()->pid,myproc()->physcnumber,myproc()->swapednumber,oldsz);//TODO delete
@@ -339,12 +409,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
       struct proc *p = myproc();
       if (p->pid>2){
-        //in case there are already 32 pages, return -1
-        if ((p->physcnumber) + (p->swapednumber)==32)
+        //in case there are already 32 pages, return 0
+        if ((p->physcnumber) + (p->swapednumber)== MAX_TOTAL_PAGES)
           return 0 ;
         
         //chaeck whether we need to make space for the new page in the ram.
-        if (p->physcnumber == 16)
+        if (p->physcnumber == MAX_PSYC_PAGES)
         {
           if (p->swapFile == 0)
           {
@@ -424,6 +494,9 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   return newsz;
 }
 
+
+
+
 // Deallocate user pages to bring the process size from oldsz to
 // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
 // need to be less than oldsz.  oldsz can be larger than the actual
@@ -479,8 +552,45 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 int
+uvmcopy_lazy(pagetable_t old, pagetable_t new, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+  char *mem;
+
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      // panic("uvmcopy: pte should exist");
+      continue;
+    if((*pte & PTE_V) == 0)
+      // panic("uvmcopy: page not present");
+      continue;
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    if((mem = kalloc()) == 0)
+      goto err;
+    memmove(mem, (char*)pa, PGSIZE);
+    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
+      kfree(mem);
+      goto err;
+    }
+  }
+  return 0;
+
+ err:
+  uvmunmap(new, 0, i / PGSIZE, 1);
+  return -1;
+}
+
+
+int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
+  #ifdef NONE
+    return uvmcopy_lazy(old, new, sz);
+  #endif
+  
   pte_t *pte;
   
   uint64 pa, i;
@@ -1024,42 +1134,56 @@ int retrievingpage (struct mpage* page){
 int handlepagefault(){
   struct proc *p = myproc();
   //retreive adress caused pagefault. we saved each page with the va of the start of the page
-  uint64 va_fault = PGROUNDDOWN(r_stval());
-  pte_t* pte; 
-  printf("\n-----------------PAGEFAULT-----------------\n\n");
-  if ((pte = walk(p->pagetable,va_fault,0)) < 0){
-    return -1;
-  } 
-  printf("va_fault is %d sz is %d\n",va_fault,p->sz);
-
-  //printf("pte is %d\n",pte);
-  //check if the pte valid flag is down and file flagis up
-  if (!(*pte & PTE_V) && (*pte & PTE_PG))
+  uint64 va_fault = r_stval();
+  // printf("\n-----------------PAGEFAULT-----------------\n\n");
+  
+  if (va_fault>p->sz)
   {
-    //printf("page is in file\n");
-    int i;
-    //find the page caused pagefault and swap it to the RAM
-    for ( i = 0; i < MAX_TOTAL_PAGES; i++)
-    {
-      //printf("allpages[i] va is %d\n",p->allpages[i].va);
-      if(p->allpages[i].va == va_fault){
-        //printf("found page  in list\n");
-        break;
-      }
-    }
-    if (i == MAX_TOTAL_PAGES){
-      panic("page caused fault wasnt found");
-    }
-    retrievingpage(&p->allpages[i]);
+    printf("\na_fault > p->sz \n%d %d       PLEASE DELETE PRINT\n\n",va_fault, p->sz );//TODO delete
+
+    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), va_fault);
+    p->killed = 1;
+    return -1;
   }
-  ///TODO: how can we detect segmentation fault? and hoe to handle this case???
-  //--seg fault--//
+  
+  
 
+  // lazy implementation
+  #ifdef NONE
+    // faulting va  <= proc's size (lazy implementation)
+    return uvmalloc(p->pagetable, PGROUNDDOWN(va_fault), PGROUNDDOWN(va_fault) + PGSIZE);    
+  #else
+    pte_t* pte; 
+    va_fault = PGROUNDDOWN(va_fault);
 
+    if ((pte = walk(p->pagetable,va_fault,0)) < 0){
+      return -1;
+    } 
+    printf("va_fault is %d sz is %d\n",va_fault,p->sz);
 
-  //
-
-  return 0;
+    //printf("pte is %d\n",pte);
+    //check if the pte valid flag is down and file flagis up
+    if (!(*pte & PTE_V) && (*pte & PTE_PG))
+    {
+      //printf("page is in file\n");
+      int i;
+      //find the page caused pagefault and swap it to the RAM
+      for ( i = 0; i < MAX_TOTAL_PAGES; i++)
+      {
+        //printf("allpages[i] va is %d\n",p->allpages[i].va);
+        if(p->allpages[i].va == va_fault){
+          //printf("found page  in list\n");
+          break;
+        }
+      }
+      if (i == MAX_TOTAL_PAGES){
+        panic("page caused fault wasnt found");
+      }
+      retrievingpage(&p->allpages[i]);
+    }
+    return 0;  
+  #endif  
 }
 
 

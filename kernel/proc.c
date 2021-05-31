@@ -277,8 +277,31 @@ userinit(void)
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
 int
+growproc_lazy(int n)
+{
+  uint sz;
+  struct proc *p = myproc();
+  // printf("in growproc: pid = %d, old sz is %d, n = %d, ",p->pid, p->sz, n);//delete
+  sz = p->sz;
+  if(n < 0){
+    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    p->sz = sz;
+  } else {
+    p->sz = sz + n;
+  }
+  printf("new size = %d\n",p->sz);
+
+  return 0;
+}
+
+int
 growproc(int n)
 {
+  // in order to implement Task 4 (implementation with / without paging)
+  #ifdef NONE
+    return growproc_lazy(n);
+  #endif
+  
   uint sz;
   struct proc *p = myproc();
   //printf("in growproc old sz is %d\n",p->sz);//delete
