@@ -229,7 +229,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   
   // if (myproc()->pid>2)
   // {
-  // printf("%d in uvmunmap with %d pages do delete. process has %d physical and %d in file  \n",myproc()->pid,myproc()->physcnumber,npages,myproc()->swapednumber);//TODO delete
+  // printf("%d in uvmunmap with %d pages do delete. process has %d physical and %d in file  \n",myproc()->pid,npages,myproc()->physcnumber,myproc()->swapednumber);//TODO delete
   // }
   uint64 a;
   pte_t *pte;
@@ -425,7 +425,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
           ///TODO: after implement getpagetoreplace, check what can it retrun.
           //get a page to move to file from ram
           int ptomoveindex = getpagetoreplace();
-          printf("got page to replace: %d\n",ptomoveindex);
+          // printf("got page to replace: %d\n",ptomoveindex);
           if (physicpagetoswapfile(&p->allpages[ptomoveindex])<0){
               // 0 indicates a failure in this function
               return 0;
@@ -478,7 +478,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       #endif
 
       ///TODO: should be >2, btu since the read\ write to file dosnt work, is >3.
-      if (page->allpagesindex>=3 )
+      if (page->allpagesindex>=0)
       {
          enqueueRAM(page);
       }
@@ -761,10 +761,11 @@ int nfua(){
   struct mpage *page = 0;
   
   while (current){
-    printf("curr: va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
+    //printf("curr: va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
+   
     // look for pages in RAM & compare to min value
     if( current->state == RAM && current->access_counter < minvalue){
-      printf("found page with minimal. va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
+      // printf("found page with minimal. va is %d , index : %d counter %p\n",current->va,current->allpagesindex,current->access_counter);
       minvalue = current->access_counter;
       page = current;
     }
@@ -786,7 +787,7 @@ int lapa(){
       if (countSetBits(current->access_counter) < countSetBits(minvalue) 
       || ((countSetBits(current->access_counter) == countSetBits(minvalue)) && current->access_counter < minvalue)){
         minvalue = current->access_counter;
-        printf("found minimal acess: page %d at index %d, had %d accesses\n",current->va,current->allpagesindex,countSetBits(current->access_counter));
+        // printf("found minimal acess: page %d at index %d, had %d accesses\n",current->va,current->allpagesindex,countSetBits(current->access_counter));
         page = current;
       }
     }
@@ -806,14 +807,14 @@ int scfifo(){
     pte = walk(p->pagetable,current->va, 0); ///TODO: add any checks here?
      //printf("after walk  %p\n",current);
     if ((*pte & PTE_A)){
-      printf("pte_a was on for page index: %d with va %d\n",current->allpagesindex,current->va);
+      //printf("pte_a was on for page index: %d with va %d\n",current->allpagesindex,current->va);
       *pte = *pte & ~PTE_A; // turn access bit off
       temp_page = current;
       current = current->next;
       queueRAMremove(temp_page);
       enqueueRAM(temp_page);
     } else { 
-      printf("pte_a was off!!!!! for page index: %d with va %d\n",current->allpagesindex,current->va);
+      //printf("pte_a was off!!!!! for page index: %d with va %d\n",current->allpagesindex,current->va);
       break;
     }
     // if (current->next == 0 && page == 0){
@@ -825,10 +826,10 @@ int scfifo(){
   }
 
   if (current == 0) {
-    printf("page == 0 !!\n");
+    //printf("page == 0 !!\n");
     return -1;  
   }
-  printf("chose page %p va = %d   allpagesindex = %d\n",current, current->va, current->allpagesindex);
+  // printf("chose page %p va = %d   allpagesindex = %d\n",current, current->va, current->allpagesindex);
   return current->allpagesindex;
 }
 
@@ -848,7 +849,7 @@ int getpagetoreplace(){
   // // <<<<<<<<<<<<<<<<<<<<<<<<<<
   
   #ifdef NONE
-    printf("getpagetoreplace(): error SELECTION=NONE\n");
+    //("getpagetoreplace(): error SELECTION=NONE\n");
     return -1;
   #endif
   
@@ -907,9 +908,10 @@ int enqueueRAM(struct mpage *page){
     current = p->queueRAM;
     while (current->next != 0)
     {
-      //printf("curr is %p\n",current);
+      //printf("curr is %d\n",current->allpagesindex);
       current = current->next;
     }
+    //printf("curr is %d set its next to beL %d\n",current->allpagesindex,page->allpagesindex);
     current->next = page;
     page->prev = current; 
   }
@@ -920,7 +922,7 @@ int enqueueRAM(struct mpage *page){
 }
 
 struct mpage* dequeueRAM(){
-  printf("dequeueRAM start\n");
+  //printf("dequeueRAM start\n");
   struct proc *p = myproc();
   struct mpage *current;
   struct mpage *page;
@@ -941,7 +943,7 @@ struct mpage* dequeueRAM(){
       current->prev->next = 0;
     }
   }
-  printf("  dequeueRAM page=%p\n",page);
+  // printf("  dequeueRAM page=%p\n",page);
   return page;
 }
 
@@ -953,9 +955,10 @@ int queueRAMremove(struct mpage *page){
     //printf(" p->queueRAM == page\n");
     p->queueRAM = page->next;
   } else {
-    //printf(" page->prev->next = page->next\n");
+    // printf(" page->prev->next = page->next\n");
     //printf("prev=%p next=%p\n", page->prev, page->next);
     page->prev->next = page->next;
+    page->next->prev = page->prev;
   }
   page->prev=0;
   page->next=0;
@@ -990,7 +993,7 @@ int physicpagetoswapfile(struct mpage* page){
     if (!p->fileentries[fileIndex]) goto found;
   }
 
-  printf("pagetoswapfile: No free entry in swap file\n");
+  //printf("pagetoswapfile: No free entry in swap file\n");
   return -1;
 
   found:
@@ -1001,17 +1004,17 @@ int physicpagetoswapfile(struct mpage* page){
     
     // Should we check the (PTE_P & *pte)?
     if (!pte){
-      printf("pagetoswapfile: pte = 0\n");
+      //printf("pagetoswapfile: pte = 0\n");
       return -1;
     } 
-    // printf("write  page to file. va is %d \n",page->va);
-    // printf("write  page to file. pa is %p \n",pa);
+    //  printf("write  page to file. va is %d \n",page->va);
+    //  printf("write  page to file. pa is %p \n",pa);
 
       
 
     
     if(writeToSwapFile(p, (char *)pa, (fileIndex*PGSIZE), PGSIZE) == -1) panic("pagetoswapfile: writeToSwapFile() failed");
-    printf("wrote  page to file, index in all pages is %d\n",page->allpagesindex);
+    //printf("wrote  page to file, index in all pages is %d\n",page->allpagesindex);
     // char buff[1024];
     // char buff2[1024] = "mochaeli";
     // memset(buff, 0, sizeof(buff));
@@ -1045,7 +1048,7 @@ int filetophysical(struct mpage* page) {
   //printf("in filetophysical for page with va: %d \n",page->va);
   // allocate a new page in the physical memory 
   if ((pa = (uint64)kalloc()) == 0){
-    printf("retrievingpage: kalloc failed\n");
+    //printf("retrievingpage: kalloc failed\n");
     return -1;
   } 
 
@@ -1074,7 +1077,7 @@ int filetophysical(struct mpage* page) {
   if(readFromSwapFile(p,(char*)pa,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
   }
-  printf("wrote page  with va : %d from file to ram!\n",page->va);
+  //printf("wrote page  with va : %d from file to ram index is %d!\n",page->va,page->allpagesindex);
 
   //get pte in the pagetable in order to set the flags
   if((pte = walk(p->pagetable,page->va, 0)) == 0){
@@ -1135,11 +1138,12 @@ int handlepagefault(){
   struct proc *p = myproc();
   //retreive adress caused pagefault. we saved each page with the va of the start of the page
   uint64 va_fault = r_stval();
-  // printf("\n-----------------PAGEFAULT-----------------\n\n");
+   //printf("\n-----------------PAGEFAULT-----------------\n\n");
+   //printf("%d %d       PLEASE DELETE PRINT\n\n",va_fault, p->sz );//TODO delete
   
   if (va_fault>p->sz)
   {
-    printf("\na_fault > p->sz \n%d %d       PLEASE DELETE PRINT\n\n",va_fault, p->sz );//TODO delete
+    
 
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), va_fault);
@@ -1160,7 +1164,7 @@ int handlepagefault(){
     if ((pte = walk(p->pagetable,va_fault,0)) < 0){
       return -1;
     } 
-    printf("va_fault is %d sz is %d\n",va_fault,p->sz);
+    //printf("va_fault is %d sz is %d\n",va_fault,p->sz);
 
     //printf("pte is %d\n",pte);
     //check if the pte valid flag is down and file flagis up

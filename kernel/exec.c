@@ -13,7 +13,7 @@ int
 exec(char *path, char **argv)
 {
 
-  // printf("in exec b1 \n");//TODO delete
+   //printf("in exec b1 \n");//TODO delete
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -33,6 +33,7 @@ exec(char *path, char **argv)
   ilock(ip);
 
   #ifndef NONE// clean pages data in proc
+  //printf("in exec, zero fileds\n");//TODO delete
     //struct mapge *page;
     struct mpage allpagesBu[MAX_TOTAL_PAGES];
     char fileentriesBu[17];
@@ -162,6 +163,7 @@ exec(char *path, char **argv)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+ //printf("exec faileed\n");//TODO delete
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(ip){

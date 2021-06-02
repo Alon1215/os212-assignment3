@@ -148,12 +148,13 @@ found:
     p->physcnumber = 0;
     p->swapednumber = 0;
     p->swapFile =0;
+    p->queueRAM = 0;
     
     int i;
     for (i = 0; i <= MAX_PSYC_PAGES; i++){
       p->fileentries[i] = 0; 
     }
-    for (i = 0; i <= MAX_TOTAL_PAGES; i++){
+    for (i = 0; i < MAX_TOTAL_PAGES; i++){
       struct mpage *page = &p->allpages[i];
       page-> va = 0; ///TODO: is it valid?
       page-> state  = FREE;
@@ -289,7 +290,7 @@ growproc_lazy(int n)
   } else {
     p->sz = sz + n;
   }
-  printf("new size = %d\n",p->sz);
+  //printf("new size = %d\n",p->sz);
 
   return 0;
 }
@@ -304,7 +305,6 @@ growproc(int n)
   
   uint sz;
   struct proc *p = myproc();
-  //printf("in growproc old sz is %d\n",p->sz);//delete
   sz = p->sz;
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
@@ -345,10 +345,10 @@ fork(void)
   #ifndef NONE
   if ( p->pid>2)
   {
-    printf("in fork2\n");
+    //printf("in fork. p has %d in file, %d in ram sz id %d\n",p->swapednumber,p->physcnumber,p->sz);
     //copy all proc fields
     memmove(&np->allpages,&p->allpages,sizeof(struct mpage) * MAX_TOTAL_PAGES);
-    memmove(&np->fileentries,&p->fileentries,sizeof(char) * MAX_TOTAL_PAGES);
+    memmove(&np->fileentries,&p->fileentries,sizeof(char) * (MAX_PSYC_PAGES+1));
     np->physcnumber = p->physcnumber;
     np->swapednumber = p->swapednumber;
     deepcopyRAMqueue(p,np);
@@ -357,6 +357,7 @@ fork(void)
     //deep copy of the swapped file
     if (p->swapFile!=0)
     {
+      //printf("copy swap file\n");
       release(&np->lock);
       createSwapFile(np);
       char buffer[1024];
@@ -366,7 +367,7 @@ fork(void)
       while(readFromSwapFile(p, buffer, offset, sizeof(buffer)) != -1 && iter<70 ){
         //printf("i");
         if(writeToSwapFile(np, buffer, offset, sizeof(buffer)) == -1){
-          //panic("failed in copyProcesses\n");
+          panic("failed in copyProcesses\n");
           break;
         }
         offset+= sizeof(buffer);
@@ -405,7 +406,7 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
-
+  // printf("finished fork. np has %d in file, %d in ram sz id %d\n",np->swapednumber,np->physcnumber,np->sz);
   return pid;
 }
 
@@ -449,6 +450,7 @@ exit(int status)
   #ifndef NONE
   if (p->swapFile!=0)
   {
+    //printf("remove swap file in exit. ram : %d file %d\n",p->physcnumber,p->swapednumber);
     removeSwapFile(p);
   }
   #endif
