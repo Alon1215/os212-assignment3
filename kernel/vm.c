@@ -464,7 +464,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
           break;
       }
     
-      //printf("set a new page in slot %d his va is %d \n",i,a);
+      // printf("set a new page in slot %d his va is %d \n",i,a);
       page = &p->allpages[i]; 
       page->state = RAM;
       page->va = a;
@@ -958,8 +958,13 @@ int queueRAMremove(struct mpage *page){
     // printf(" page->prev->next = page->next\n");
     //printf("prev=%p next=%p\n", page->prev, page->next);
     page->prev->next = page->next;
-    page->next->prev = page->prev;
+    if (page->next)
+    {
+      page->next->prev = page->prev;
   }
+    }
+    
+    
   page->prev=0;
   page->next=0;
     //printf(" queueRAMremove END\n");
@@ -1026,7 +1031,6 @@ int physicpagetoswapfile(struct mpage* page){
     p->physcnumber--;
     page->state = FILE;
     page->entriesarrayindex = fileIndex;
-
     queueRAMremove(page);
     kfree((void*)pa);
     
@@ -1045,7 +1049,7 @@ int filetophysical(struct mpage* page) {
   struct proc *p = myproc();
   pte_t *pte;
 
-  //printf("in filetophysical for page with va: %d \n",page->va);
+  // printf("in filetophysical for page with va: %d \n",page->va);
   // allocate a new page in the physical memory 
   if ((pa = (uint64)kalloc()) == 0){
     //printf("retrievingpage: kalloc failed\n");
@@ -1072,12 +1076,12 @@ int filetophysical(struct mpage* page) {
   
   
 
-  //printf("about to read page  with va : %d to %p from file to ram! index is %d\n",page->va,pa,page->entriesarrayindex);
+  // printf("about to read page  with va : %d to %p from file to ram! index is %d\n",page->va,pa,page->entriesarrayindex);
   // copy page to pa
   if(readFromSwapFile(p,(char*)pa,page->entriesarrayindex*PGSIZE,PGSIZE) < 0){
     return -1;
   }
-  //printf("wrote page  with va : %d from file to ram index is %d!\n",page->va,page->allpagesindex);
+  // printf("wrote page  with va : %d from file to ram index is %d!\n",page->va,page->allpagesindex);
 
   //get pte in the pagetable in order to set the flags
   if((pte = walk(p->pagetable,page->va, 0)) == 0){
@@ -1138,7 +1142,7 @@ int handlepagefault(){
   struct proc *p = myproc();
   //retreive adress caused pagefault. we saved each page with the va of the start of the page
   uint64 va_fault = r_stval();
-   //printf("\n-----------------PAGEFAULT-----------------\n\n");
+  //  printf("\n-----------------PAGEFAULT-----------------\n\n");
    //printf("%d %d       PLEASE DELETE PRINT\n\n",va_fault, p->sz );//TODO delete
   
   if (va_fault>p->sz)
